@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* --- BRAND AND BACKGROUND REDEFINITIONS FOR AN ACADEMIC ROYAL NAVY & INDIGO PALETTE --- */
+  
+  --color-slate-50: #f8fafc;     /* Clean light-mode slate-gray background */
+  --color-slate-100: #f1f5f9;    /* Light slate borders and rails */
+  --color-slate-150: #e2e8f0;    /* Muted card border gray */
+  --color-slate-200: #cbd5e1;    /* Slate-200 border */
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;    /* Muted tertiary descriptor text */
+  --color-slate-405: #64748b;    /* High contrast slate secondary gray text */
+  --color-slate-450: #475569;    /* Clean visible charcoal gray text */
+  --color-slate-455: #334155;    /* Very strong visible secondary slate gray */
+  --color-slate-500: #64748b;
+  --color-slate-550: #334155;    /* Strong charcoal */
+  --color-slate-800: #1e293b;    /* Dark mode accent frame */
+  --color-slate-805: #0f172a;    /* Deep navy black dark support */
+  --color-slate-850: #0f172a;    /* Dark navy header border text */
+  --color-slate-900: #0f172a;    /* Beautiful midnight navy paper card element */
+  --color-slate-905: #020617;    /* Charcoal black heading color */
+  --color-slate-950: #020617;    /* Ultimate midnight-blue base canvas */
+
+  --color-indigo-50: #f5f3ff;
+  --color-indigo-100: #ede9fe;
+  --color-indigo-200: #ddd6fe;
+  --color-indigo-300: #c084fc;
+  --color-indigo-400: #818cf8;
+  --color-indigo-405: #6366f1;
+  --color-indigo-450: #4f46e5;
+  --color-indigo-455: #3730a3;
+  --color-indigo-500: #6366f1;
+  --color-indigo-550: #4f46e5;
+  --color-indigo-600: #4f46e5;   /* Authentic school brand royal indigo blue */
+  --color-indigo-650: #3730a3;   /* Rich educational dark navy indigo */
+  --color-indigo-700: #312e81;   /* Royal deep academic navy */
+  --color-indigo-800: #1e1b4b;
+  --color-indigo-805: #1e1b4b;
+  --color-indigo-850: #0c0a25;
+  --color-indigo-900: #1e1b4b;
+  --color-indigo-905: #312e81;   /* High contrast slate-dark contrast color */
+  --color-indigo-950: #030712;
+
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-650: #1d4ed8;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;     /* Deep professional academic blue */
+  --color-blue-950: #172554;
+
+  --color-amber-50: #fffbeb;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-405: #b45309;    /* Visible gold contrast text */
+  --color-amber-500: #f59e0b;
+  --color-amber-550: #d97706;    /* Mustard gold text and badges */
+  --color-amber-600: #d97706;
+
+  --color-emerald-50: #f0fdf4;
+  --color-emerald-500: #10b981;
+  --color-emerald-555: #047857;
+  --color-emerald-505: #047857;  /* Deep school score emerald green text */
+  --color-emerald-600: #059669;
+
+  --color-red-500: #ef4444;
+  --color-red-505: #b91c1c;      /* Bold warning red for tab cheating violations */
+  --color-red-550: #b91c1c;
+  --color-red-650: #991b1b;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+/* Fade In Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Print Styles for official receipts/records slips */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-card {
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    color: black !important;
+    padding: 20px !important;
+  }
+}
+

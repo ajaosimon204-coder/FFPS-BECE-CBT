@@ -1,0 +1,8 @@
+{
+  "name": "Faith Foundation CBT",
+  "description": "A professional computer-based testing (CBT) platform for BECE Junior Secondary JSS 3 students preparing for exams.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
