@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { Result, User } from "../types";
 import { toggleBookmarkInDB, isQuestionBookmarked } from "../lib/results";
 import LucideIcon from "./LucideIcon";
+import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 
 interface CbtResultViewProps {
   user: User;
@@ -86,9 +87,12 @@ export default function CbtResultView({
           {/* SCHOOL LOGO BANNER HEADER */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-6 border-slate-100 dark:border-slate-800/60 gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-900 dark:bg-indigo-950 text-indigo-100 rounded-2xl shadow-sm">
-                <LucideIcon name="School" size={26} />
-              </div>
+              <img 
+                src={schoolLogo} 
+                alt="Faith Foundation Logo" 
+                className="w-14 h-14 object-contain rounded-full shadow-md bg-white border border-slate-200/60" 
+                referrerPolicy="no-referrer"
+              />
               <div>
                 <h1 className="text-lg sm:text-xl font-bold text-indigo-900 dark:text-white tracking-tight uppercase">FAITH FOUNDATION SCHOOLS</h1>
                 <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">OFFICIAL BECE COMPUTER-BASED REPORT SLIP</p>

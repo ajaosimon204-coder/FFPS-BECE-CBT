@@ -13,6 +13,7 @@ import {
 } from "../data/questionDatabase";
 import { getResultsFromDB } from "../lib/results";
 import LucideIcon from "./LucideIcon";
+import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 import {
   ResponsiveContainer,
   BarChart,
@@ -456,14 +457,15 @@ export default function AdminDashboard({
       <header className={`sticky top-0 z-45 border-b backdrop-blur-md transition-colors ${darkMode ? "bg-slate-950/90 border-slate-800/60 text-slate-100" : "bg-white/95 border-slate-200/60 text-slate-850 shadow-xs"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-xs">
-              <div className="w-5.5 h-5.5 bg-indigo-600 rounded-sm transform rotate-45 flex items-center justify-center">
-                <span className="text-[9px] font-black transform -rotate-45 text-white font-mono">FF</span>
-              </div>
-            </div>
+            <img 
+              src={schoolLogo} 
+              alt="Faith Foundation School Seal" 
+              className="w-10 h-10 object-contain rounded-full shadow-md bg-white border border-slate-205/60" 
+              referrerPolicy="no-referrer"
+            />
             <div>
-              <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white uppercase">FAITH FOUNDATION</h1>
-              <p className={`text-[9px] font-mono tracking-wider uppercase ${darkMode ? "text-slate-400" : "text-indigo-600"}`}>ADMIN CONTROL CENTER</p>
+              <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white uppercase leading-none">FAITH FOUNDATION</h1>
+              <p className={`text-[9px] font-mono tracking-wider uppercase mt-0.5 ${darkMode ? "text-slate-400" : "text-indigo-600"}`}>ADMIN CONTROL CENTER</p>
             </div>
           </div>
 

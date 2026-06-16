@@ -286,6 +286,35 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
     "SYLLABUS OBJECTIVE:"
   ];
 
+  // Independent sub-indexes to guarantee all unique dataset entries are sequentially fully exhausted
+  let synonymSubIndex = 0;
+  let antonymSubIndex = 0;
+  let concordSubIndex = 0;
+  let prepsSubIndex = 0;
+  let spellingSubIndex = 0;
+
+  let bioSubIndex = 0;
+  let techSubIndex = 0;
+  let compSubIndex = 0;
+  let pheSubIndex = 0;
+
+  let cropSubIndex = 0;
+  let agSubIndex = 0;
+  let homeSubIndex = 0;
+
+  let civicsSubIndex = 0;
+  let socialSubIndex = 0;
+  let securitySubIndex = 0;
+  let democracySubIndex = 0;
+
+  let booksSubIndex = 0;
+  let officeSubIndex = 0;
+  let commSubIndex = 0;
+
+  let onkaSubIndex = 0;
+  let asaSubIndex = 0;
+  let edeSubIndex = 0;
+
   while (index < target) {
     let qText = "";
     let options: string[] = [];
@@ -374,13 +403,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { word: "hazardous", syn: "risky", options: ["risky", "secure", "healthy", "simple"], exp: "Hazardous means risky or dangerous." },
           { word: "subtle", syn: "delicate", options: ["delicate", "obvious", "strong", "rough"], exp: "Subtle means so delicate or precise as to be difficult to analyze or describe." }
         ];
-        const item = synonymsList[index % synonymsList.length];
+        const item = synonymsList[synonymSubIndex % synonymsList.length];
         qText = `${tag} Identify the option closest in meaning (SYNONYM) to the capitalized word: ${studentName} is known to be extremely ${item.word.toUpperCase()} in JSS3.`;
         correct = item.syn;
         options = item.options;
         explanation = item.exp;
         topic = "Synonyms";
         diff = "Medium";
+        synonymSubIndex++;
       } else if (type === 1) {
         // Antonyms
         const antonymsList = [
@@ -395,13 +425,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { word: "generous", ant: "miserly", options: ["miserly", "kind", "happy", "giving"], exp: "Generous means sharing freely; the opposite is miserly or stingy." },
           { word: "rigid", ant: "flexible", options: ["flexible", "stiff", "coarse", "hard"], exp: "Rigid means stiff and unbending; the opposite is flexible." }
         ];
-        const item = antonymsList[index % antonymsList.length];
+        const item = antonymsList[antonymSubIndex % antonymsList.length];
         qText = `${tag} Choose the option containing the ideal ANTONYM (opposite in meaning) of: '${item.word.toUpperCase()}'.`;
         correct = item.ant;
         options = item.options;
         explanation = item.exp;
         topic = "Antonyms";
         diff = "Medium";
+        antonymSubIndex++;
       } else if (type === 2) {
         // Concord
         const concords = [
@@ -415,13 +446,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { sub: "Many a candidate", verb: "has", opts: ["has", "have", "are", "were"], exp: "'Many a' is followed by a singular noun and singular verb ('has')." },
           { sub: `${studentName} as well as his friends`, verb: "is", opts: ["is", "are", "were", "have"], exp: "When a parenthetical phrase ('as well as...') is used, the verb agrees with the main subject ('is')." }
         ];
-        const item = concords[index % concords.length];
+        const item = concords[concordSubIndex % concords.length];
         qText = `${tag} Choose the option that best completes the sentence grammatically: '${item.sub} ________ currently preparing for the CBT trial.'`;
         correct = item.verb;
         options = item.opts;
         explanation = item.exp;
         topic = "Grammar & Concord";
         diff = "Medium";
+        concordSubIndex++;
       } else if (type === 3) {
         // Prepositions
         const preps = [
@@ -433,13 +465,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { phrase: "is outstandingly good ________ mathematics", prep: "at", opts: ["at", "in", "with", "for"], exp: "To be skilled is to be 'good at' something." },
           { phrase: "must abstain ________ bad habits", prep: "from", opts: ["from", "with", "by", "against"], exp: "'Abstain' translates to staying away 'from'." }
         ];
-        const item = preps[index % preps.length];
+        const item = preps[prepsSubIndex % preps.length];
         qText = `${tag} Select the appropriate preposition to complete: '${studentName} ${item.phrase}.'`;
         correct = item.prep;
         options = item.opts;
         explanation = item.exp;
         topic = "Prepositions";
         diff = "Easy";
+        prepsSubIndex++;
       } else {
         // Spelling & Analogy
         const spellings = [
@@ -449,13 +482,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "Complete the analogy: Kitten is to Cat as Foal is to ________", a: "Horse", opts: ["Horse", "Dog", "Goat", "Deer"], exp: "Foal is a baby horse, just as kitten is a baby cat." },
           { q: "Complete the analogy: Scale is to Weight as Thermometer is to ________", a: "Temperature", opts: ["Temperature", "Pressure", "Speed", "Water"], exp: "A thermometer measures temperature, just as a scale measures weight." }
         ];
-        const item = spellings[index % spellings.length];
+        const item = spellings[spellingSubIndex % spellings.length];
         qText = `${tag} ${studentName} was asked: "${item.q}"`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Analogy & Spelling";
         diff = "Easy";
+        spellingSubIndex++;
       }
     } else if (subjectId === "basic_science_tech") {
       const type = index % 4;
@@ -470,13 +504,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "The process of green plant cells converting carbon dioxide and water into glucose is:", a: "Photosynthesis", opts: ["Photosynthesis", "Respiration", "Transpiration", "Decomposition"], exp: "Photosynthesis produces food using raw sunlight, carbon dioxide, and water." },
           { q: "What is the standard chemical formula representing water?", a: "H2O", opts: ["H2O", "CO2", "NaCl", "O2"], exp: "Water consists of 2 Hydrogen atoms and 1 Oxygen atom." }
         ];
-        const item = bioList[index % bioList.length];
+        const item = bioList[bioSubIndex % bioList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Basic Science";
         diff = "Medium";
+        bioSubIndex++;
       } else if (type === 1) {
         // Basic Tech
         const techList = [
@@ -485,13 +520,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "What kind of wooden hammer mallet is specifically engineered to strike wood chisels?", a: "Wooden mallet", opts: ["Wooden mallet", "Sledge hammer", "Ball-peen hammer", "Claw hammer"], exp: "A wooden mallet transfers soft force, protecting wood chisel handles." },
           { q: "In engineering tech drawings, what does a dashed thin line typically represent?", a: "Hidden details", opts: ["Hidden details", "Center lines", "Cutting planes", "Visible borders"], exp: "Dashed lines represent hidden geometry not directly visible from the view." }
         ];
-        const item = techList[index % techList.length];
+        const item = techList[techSubIndex % techList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Basic Technology";
         diff = "Medium";
+        techSubIndex++;
       } else if (type === 2) {
         // Computer Studies
         const compList = [
@@ -500,13 +536,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "Which program utility translates high-level source code completely to machines code in one sweep?", a: "Compiler", opts: ["Compiler", "Interpreter", "Assembler", "Linker"], exp: "Compilers convert the entire source code file to a binary executable at once." },
           { q: "What local network structure represents the abbreviation 'LAN'?", a: "Local Area Network", opts: ["Local Area Network", "Logistical Array Network", "Long Access Node", "Laid Area Network"], exp: "LAN connects machines inside a single room or school compound." }
         ];
-        const item = compList[index % compList.length];
+        const item = compList[compSubIndex % compList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Computer Studies";
         diff = "Easy";
+        compSubIndex++;
       } else {
         // PHE
         const pheList = [
@@ -514,13 +551,14 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "What first-aid treatment is recommended for immediate local sports muscle sprain injuries?", a: "R.I.C.E. protocol", opts: ["R.I.C.E. protocol", "Intense massage", "Running exercise", "Hot compressing"], exp: "R.I.C.E. stands for Rest, Ice, Compression, Elevation, which reduces acute swelling." },
           { q: "Which organ synthesizes the digestive bile liquid stored in the gallbladder?", a: "Liver", opts: ["Liver", "Stomach", "Pancreas", "Heart"], exp: "Bile is manufactured in the liver and stores inside the gallbladder." }
         ];
-        const item = pheList[index % pheList.length];
+        const item = pheList[pheSubIndex % pheList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Physical & Health Education";
         diff = "Easy";
+        pheSubIndex++;
       }
     } else if (subjectId === "prevocational_studies") {
       const type = index % 3;
@@ -535,7 +573,7 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { crop: "Cotton", val: "Fiber crop", exp: "Cotton is cultivated for fiber used in weaving." },
           { crop: "Yam", val: "Tuber crop", exp: "Yam is a stem tuber cultivated in the tropics." }
         ];
-        const item = cropsList[index % cropsList.length];
+        const item = cropsList[cropSubIndex % cropsList.length];
         qText = `${tag} In agricultural studies, ${item.crop} is classified primarily as a:`;
         correct = item.val;
         options = [item.val, "Spice crop", "Forage crop", "Beverage crop"].filter((v, i, self) => self.indexOf(v) === i);
@@ -543,32 +581,35 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
         explanation = item.exp;
         topic = "Crop Types";
         diff = "Medium";
+        cropSubIndex++;
       } else if (type === 1) {
         const agList = [
           { q: "What artificial irrigation method is best for dry soil?", a: "Irrigation", opts: ["Irrigation", "Drainage", "De-silting", "Mulching"], exp: "Irrigation provides water to dry lands." },
           { q: "Which animal parasite represents cattle ticks feeding on skin?", a: "Tick", opts: ["Tick", "Tapeworm", "Louse", "Fluke"], exp: "Ticks are common external parasites on cattle." },
           { q: "Which soil building nutrient promotes thick leaf vegetative growth?", a: "Nitrogen", opts: ["Nitrogen", "Potassium", "Humus", "Boron"], exp: "Nitrogen acts as a catalyst for green vegetative leaf cells." }
         ];
-        const item = agList[index % agList.length];
+        const item = agList[agSubIndex % agList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Agricultural Science";
         diff = "Medium";
+        agSubIndex++;
       } else {
         const homeList = [
           { q: "Which food nutrient serves to repair damaged tissue blocks?", a: "Proteins", opts: ["Proteins", "Fats", "Starch", "Vitamins"], exp: "Proteins construct muscle cells and mend tissue." },
           { q: "Which laundry material is perfect to lower surface tension of grease?", a: "Detergent", opts: ["Detergent", "Bleach", "Starch", "Acid"], exp: "Detergents reduce active surface tension." },
           { q: "Which deficiency represents lack of proper Vitamin A intake?", a: "Night blindness", opts: ["Night blindness", "Kwashiorkor", "Scurvy", "Rockets"], exp: "Vitamin A keeps eye rod pigments healthy." }
         ];
-        const item = homeList[index % homeList.length];
+        const item = homeList[homeSubIndex % homeList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Home Economics";
         diff = "Easy";
+        homeSubIndex++;
       }
     } else if (subjectId === "national_value") {
       const type = index % 4;
@@ -580,52 +621,56 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "Which of the following describes franchise in political science?", a: "Right to vote", opts: ["Right to vote", "Right to execute rules", "Sovereignty of power", "Diplomatic immunity"], exp: "Franchise is the constitutional right of choice by voting." },
           { q: "Which duty represents principal civic obligations of citizens?", a: "Paying tax promptly", opts: ["Paying tax promptly", "Altering highway routes", "Conducting private laws", "Refusing military call"], exp: "Tax payment supports public works and state funding." }
         ];
-        const item = civicsList[index % civicsList.length];
+        const item = civicsList[civicsSubIndex % civicsList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Civic Education";
         diff = "Easy";
+        civicsSubIndex++;
       } else if (type === 1) {
         // Social Studies
         const socialList = [
           { q: "Which division of parenting represents nuclear family structures?", a: "Parents and children", opts: ["Parents and children", "Uncles and cousins", "Clan segments", "Ancestral compound"], exp: "Nuclear family consists only of parents and their biological or legal children." },
           { q: "What community term describes ethnocentrism beliefs and conflicts?", a: "Ethnic superiority belief", opts: ["Ethnic superiority belief", "National integration", "Public collaboration", "Bilingual harmony"], exp: "Ethnocentrism believes its cultural tribe is superior to others." }
         ];
-        const item = socialList[index % socialList.length];
+        const item = socialList[socialSubIndex % socialList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Social Studies";
         diff = "Easy";
+        socialSubIndex++;
       } else if (type === 2) {
         // Security
         const securityList = [
           { q: "Which agency represents public highway safety control in Nigeria?", a: "FRSC", opts: ["FRSC", "EFCC", "NEMA", "NDLEA"], exp: "Federal Road Safety Corps polices speed limits and road transit safety." },
           { q: "What action represents proper safety if handled suspicious parcels?", a: "Reject and report to parents", opts: ["Reject and report to parents", "Accept it quickly", "Tuck it inside a bag", "Open it with force"], exp: "Always notify elders about unidentified items." }
         ];
-        const item = securityList[index % securityList.length];
+        const item = securityList[securitySubIndex % securityList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Security Education";
         diff = "Medium";
+        securitySubIndex++;
       } else {
         // Constitution
         const democracyList = [
           { q: "What is the supreme code of legal authority defining a country?", a: "Constitution", opts: ["Constitution", "Decree", "Manifesto", "School syllabus"], exp: "The constitution outlines governance responsibilities and overrides other acts." },
           { q: "Which commission organizes democratic voting elections in Nigeria?", a: "INEC", opts: ["INEC", "FIRS", "CAC", "NPHCDA"], exp: "INEC is the Independent National Electoral Commission." }
         ];
-        const item = democracyList[index % democracyList.length];
+        const item = democracyList[democracySubIndex % democracyList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Constitution & Democracy";
         diff = "Medium";
+        democracySubIndex++;
       }
     } else if (subjectId === "business_studies") {
       const type = index % 3;
@@ -637,39 +682,42 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "Which ledger accounts registry records cash transaction details?", a: "Cash Book", opts: ["Cash Book", "Purchases Log", "Sales Day Book", "Petty cash voucher"], exp: "Cash Book handles cash payments and receipts." },
           { q: "Calculate missing value: Assets = Liabilities + owner's ________.", a: "Capital", opts: ["Capital", "Cash flow", "Merchandise", "Losses"], exp: "Accounting equation balances Assets against Liabilities plus Capital." }
         ];
-        const item = booksList[index % booksList.length];
+        const item = booksList[booksSubIndex % booksList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Bookkeeping";
         diff = "Medium";
+        booksSubIndex++;
       } else if (type === 1) {
         // Office Practices
         const officeList = [
           { q: "Which key is struck to start typed text characters on a fresh line?", a: "Enter key", opts: ["Enter key", "Space bar", "Shift lock", "Alt node"], exp: "Enter key moves focus to the new line." },
           { q: "What records preservation process represents filing folders?", a: "Filing", opts: ["Filing", "Shredding", "Posting", "Billing"], exp: "Filing systematically compiles and keeps papers for easy retrieval." }
         ];
-        const item = officeList[index % officeList.length];
+        const item = officeList[officeSubIndex % officeList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Office Practices";
         diff = "Easy";
+        officeSubIndex++;
       } else {
         // Commerce
         const commList = [
           { q: "What activity is wholesaling and retailing to buyers?", a: "Trade", opts: ["Trade", "Farming", "Manufacturing", "Banking"], exp: "Trade is buying and selling goods for a margin." },
           { q: "Who purchases goods in bulk from active factories to feed retail outlets?", a: "Wholesaler", opts: ["Wholesaler", "Broker", "Stoker", "Consumer"], exp: "Wholesalers process bulk orders to distribute to retailers." }
         ];
-        const item = commList[index % commList.length];
+        const item = commList[commSubIndex % commList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Commerce";
         diff = "Easy";
+        commSubIndex++;
       }
     } else if (subjectId === "yoruba") {
       const type = index % 3;
@@ -681,39 +729,42 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
           { q: "Sọ nọ́ḿbà Òǹkà Yoruba 'Aádọ́ta' ní èdè Gẹ̀ẹ́sì: ", a: "50", opts: ["50", "40", "60", "30"], exp: "Aádọ́ta jẹ́ 50 ní èdè Gẹ̀ẹ́sì." },
           { q: "Kí ni iye nọ́ḿbà 'ọgbọ̀n' ní èdè Gẹ̀ẹ́sì?", a: "30", opts: ["30", "20", "40", "50"], exp: "Ọgbọ̀n dọ́gba pẹ̀lú 30." }
         ];
-        const item = onkaList[index % onkaList.length];
+        const item = onkaList[onkaSubIndex % onkaList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Òǹkà Yoruba";
         diff = "Medium";
+        onkaSubIndex++;
       } else if (type === 1) {
         // Àṣà
         const asaList = [
           { q: "Kí ni ọ̀nà títọ́ fún ọkùnrin láti kí àgbàlagbà ní ilẹ̀ Yoruba?", a: "Dídọ̀bálẹ̀", opts: ["Dídọ̀bálẹ̀", "Yíkúnlẹ̀", "Nína ọwọ́", "Ṣíṣe sálúùtì"], exp: "Ọkùnrin máa ń dọ̀bálẹ̀ fún ọ̀wọ̀ ní ilẹ̀ Yoruba." },
           { q: "Kí ni àṣà títọ́ fún obìnrin láti kí àgbàlagbà ní ilẹ̀ Yoruba?", a: "Yíkúnlẹ̀", opts: ["Yíkúnlẹ̀", "Dídọ̀bálẹ̀", "Ìfẹnukonu", "Yíyọ́-apá"], exp: "Obìnrin máa ń kúnlẹ̀ láti kí àgbà fún ọ̀wọ̀." }
         ];
-        const item = asaList[index % asaList.length];
+        const item = asaList[asaSubIndex % asaList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Àṣà Yoruba";
         diff = "Easy";
+        asaSubIndex++;
       } else {
         // Èdè & Àmì Ohùn
         const edeList = [
           { q: "Kí ni àmì ohùn tó wà lórí ọ̀rọ̀ 'bọ̀' (bíi 'kábọ̀')?", a: "Àmì Ìsàlẹ̀ (\\)", opts: ["Àmì Ìsàlẹ̀ (\\)", "Àmì Òkè (/)", "Àmì Àárín (-)", "Àmì Meji"], exp: "Àmì ohùn ìsàlẹ̀ (\\) jẹ́ 'dò' (ohùn balẹ̀)." },
           { q: "Fáwẹ́lì mélòó ni ó wà nínú Alifabẹ́ẹ̀tì èdè Yoruba?", a: "Meje (7)", opts: ["Meje (7)", "Márùn-ún (5)", "Mẹ́sàn-án (9)", "Mẹ́fà (6)"], exp: "Fáwẹ́lì èdè Yoruba jẹ́ 7: a, e, ẹ, i, o, ọ, u." }
         ];
-        const item = edeList[index % edeList.length];
+        const item = edeList[edeSubIndex % edeList.length];
         qText = `${tag} ${item.q}`;
         correct = item.a;
         options = item.opts;
         explanation = item.exp;
         topic = "Èdè & Àmì Ohùn";
         diff = "Medium";
+        edeSubIndex++;
       }
     } else {
       qText = `General Revision Question #${index + 1}: Which option is correct?`;
@@ -793,10 +844,13 @@ export function initializeDB(): Question[] {
 
 export function getQuestionsFromDB(): Question[] {
   const current = localStorage.getItem("FF_CBT_QUESTIONS");
+  const forceRefresh = !localStorage.getItem("FF_CBT_DB_V4_REPEATS_FIXED");
+  
   // Check if it's the old database format or missing our duplicate prevention overhaul
-  if (current && (current.includes('"cca"') || current.includes('"basic_science"') || !current.includes('"basic_science_tech"') || !current.includes("REVISION QUIZ:"))) {
+  if (forceRefresh || (current && (current.includes('"cca"') || current.includes('"basic_science"') || !current.includes('"basic_science_tech"') || !current.includes("REVISION QUIZ:")))) {
     localStorage.removeItem("FF_CBT_QUESTIONS");
     localStorage.removeItem("FF_CBT_DB_INITIALIZED");
+    localStorage.setItem("FF_CBT_DB_V4_REPEATS_FIXED", "true");
     return initializeDB();
   }
   

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion } from "motion/react";
 import { SUBJECTS } from "../data/subjectData";
 import LucideIcon from "./LucideIcon";
+import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 
 interface HomepageProps {
   onNavToAuth: (mode: "login" | "register", role: "STUDENT" | "ADMIN") => void;
@@ -48,12 +49,15 @@ export default function Homepage({ onNavToAuth, darkMode, setDarkMode }: Homepag
       <header className={`sticky top-0 z-40 backdrop-blur-md border-b ${darkMode ? "bg-slate-950/90 border-slate-800/60" : "bg-white/90 border-slate-200/60"} transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-tr from-indigo-650 to-indigo-500 rounded-xl text-white shadow-sm shadow-indigo-500/20 flex items-center justify-center">
-              <LucideIcon name="School" size={22} />
-            </div>
+            <img 
+              src={schoolLogo} 
+              alt="Faith Foundation Logo" 
+              className="w-11 h-11 object-contain rounded-full shadow-md bg-white border border-slate-200/60" 
+              referrerPolicy="no-referrer"
+            />
             <div>
-              <h1 className="text-base font-bold tracking-tight text-indigo-600 dark:text-indigo-400 font-sans">FAITH FOUNDATION</h1>
-              <p className="text-[9px] font-medium tracking-widest text-slate-400 uppercase">BECE CBT PORTAL</p>
+              <h1 className="text-base font-bold tracking-tight text-indigo-600 dark:text-indigo-400 font-sans leading-none">FAITH FOUNDATION</h1>
+              <p className="text-[9px] font-medium tracking-widest text-slate-400 uppercase mt-0.5">BECE CBT PORTAL</p>
             </div>
           </div>
 
@@ -447,8 +451,13 @@ export default function Homepage({ onNavToAuth, darkMode, setDarkMode }: Homepag
       <footer className={`border-t py-12 ${darkMode ? "bg-slate-950 border-slate-900 text-slate-400" : "bg-slate-900 text-slate-300"} transition-colors`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-3 gap-8">
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-white">
-              <LucideIcon name="School" size={18} className="text-indigo-500" />
+            <div className="flex items-center gap-2.5 text-white">
+              <img 
+                src={schoolLogo} 
+                alt="Faith Foundation Logo" 
+                className="w-8 h-8 object-contain rounded-full shadow-sm bg-white" 
+                referrerPolicy="no-referrer"
+              />
               <span className="font-extrabold tracking-tight">FAITH FOUNDATION</span>
             </div>
             <p className="text-xs leading-relaxed text-slate-400">

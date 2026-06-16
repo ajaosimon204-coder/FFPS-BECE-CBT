@@ -4,6 +4,7 @@ import { Question, ExamConfig, User, Subject } from "../types";
 import { SUBJECTS } from "../data/subjectData";
 import { toggleBookmarkInDB, isQuestionBookmarked } from "../lib/results";
 import LucideIcon from "./LucideIcon";
+import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 
 interface CbtExamViewProps {
   user: User;
@@ -11,7 +12,7 @@ interface CbtExamViewProps {
   allQuestions: Question[];
   darkMode: boolean;
   onCancelExam: () => void;
-  onSubmitExam: (answers: Record<string, string>, timeUsedSeconds: number, tabBreaches: number) => void;
+  onSubmitExam: (answers: Record<string, string>, timeUsedSeconds: number, tabBreaches: number, examQuestions: Question[]) => void;
 }
 
 export default function CbtExamView({
@@ -92,13 +93,23 @@ export default function CbtExamView({
     // Filter subject questions
     const subjectQ = allQuestions.filter((q) => q.subjectId === config.subjectId);
     
+    // Deduplicate questions by normalized questionText to strictly guarantee no repeated questions can ever be selected
+    const uniqueQMap = new Map<string, Question>();
+    subjectQ.forEach((q) => {
+      const normalized = q.questionText.trim().toLowerCase();
+      if (!uniqueQMap.has(normalized)) {
+        uniqueQMap.set(normalized, q);
+      }
+    });
+    const uniqueSubjectQ = Array.from(uniqueQMap.values());
+    
     // Random select 'questionCount' number of questions
-    const shuffled = [...subjectQ].sort(() => 0.5 - Math.random());
+    const shuffled = [...uniqueSubjectQ].sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, Math.min(config.questionCount, shuffled.length));
 
     // Process options shuffling for each question
     const processed = selected.map((q) => {
-      const opts = [...q.originalOptions];
+      const opts = [...(q.originalOptions || q.options || [])];
       // Shuffle options randomly
       const shuffledOptions = opts.sort(() => 0.5 - Math.random());
       return {
@@ -245,7 +256,7 @@ export default function CbtExamView({
     
     // Compute total time spent
     const timeSpent = totalTimeSeconds - timeLeft;
-    onSubmitExam(answers, Math.max(1, timeSpent), cheatingAttempts);
+    onSubmitExam(answers, Math.max(1, timeSpent), cheatingAttempts, questions);
   };
 
   const formatTime = (secs: number) => {
@@ -276,11 +287,12 @@ export default function CbtExamView({
       {/* HEADER EXAM STRIP */}
       <header className={`p-4 border-b ${darkMode ? "bg-slate-900 border-slate-800/60" : "bg-indigo-900 border-indigo-950 text-white"} flex flex-wrap items-center justify-between gap-4 no-print shadow-sm`}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-sm">
-            <div className="w-5.5 h-5.5 bg-indigo-900 rounded-sm transform rotate-45 flex items-center justify-center">
-              <span className={`text-[9px] font-black transform -rotate-45 text-white font-mono`}>FF</span>
-            </div>
-          </div>
+          <img 
+            src={schoolLogo} 
+            alt="Faith Foundation School Seal" 
+            className="w-10 h-10 object-contain rounded-full shadow-md bg-white border border-slate-205/60" 
+            referrerPolicy="no-referrer"
+          />
           <div>
             <h2 className="text-sm font-bold tracking-tight uppercase flex items-center gap-2">
               <span>FAITH FOUNDATION</span>

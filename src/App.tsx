@@ -5,6 +5,7 @@ import { getCurrentUser, loginUser, registerStudent, logoutUser, getUsersFromDB 
 import { getQuestionsFromDB } from "./data/questionDatabase";
 import { saveResult, getGrade } from "./lib/results";
 import { SUBJECTS } from "./data/subjectData";
+import schoolLogo from "./assets/images/school_logo_1781627574517.jpg";
 
 // Subcomponets
 import Homepage from "./components/Homepage";
@@ -132,11 +133,21 @@ export default function App() {
     setView("STUDENT_DASHBOARD");
   };
 
-  const handleSubmitCbtExam = (userAnswers: Record<string, string>, timeUsedSeconds: number) => {
+  const handleSubmitCbtExam = (
+    userAnswers: Record<string, string>,
+    timeUsedSeconds: number,
+    tabBreaches: number,
+    examQuestions?: Question[]
+  ) => {
     if (!currentUser || !activeExamConfig) return;
 
-    const questionsList = getQuestionsFromDB();
-    const activeQ = questionsList.filter((q) => q.subjectId === activeExamConfig.subjectId).slice(0, activeExamConfig.questionCount);
+    let activeQ: Question[] = [];
+    if (examQuestions && examQuestions.length > 0) {
+      activeQ = examQuestions;
+    } else {
+      const questionsList = getQuestionsFromDB();
+      activeQ = questionsList.filter((q) => q.subjectId === activeExamConfig.subjectId).slice(0, activeExamConfig.questionCount);
+    }
     
     // Evaluate correctness
     let correct = 0;
@@ -148,7 +159,7 @@ export default function App() {
       return {
         questionId: q.id,
         questionText: q.questionText,
-        options: q.options,
+        options: q.options || q.originalOptions,
         studentAnswer: studentAns,
         correctAnswer: q.correctAnswer,
         explanation: q.explanation,
@@ -229,11 +240,12 @@ export default function App() {
               </button>
 
               <div className="text-center space-y-3 pt-4">
-                <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0 shadow-md mx-auto">
-                  <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0 transform rotate-12">
-                    <LucideIcon name="Lock" className="text-indigo-600" size={18} />
-                  </div>
-                </div>
+                <img 
+                  src={schoolLogo} 
+                  alt="Faith Foundation School Seal" 
+                  className="w-16 h-16 object-contain rounded-full shadow-md bg-white border border-slate-200/60 mx-auto" 
+                  referrerPolicy="no-referrer"
+                />
                 <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
                   {authMode === "login" ? `${authRole === UserRole.ADMIN ? "Educator" : "Student"} Login` : "Student Registration"}
                 </h2>
