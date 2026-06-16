@@ -273,6 +273,19 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
   const generated: Question[] = [];
   let index = currentCount;
 
+  const quizTags = [
+    "REVISION QUIZ:",
+    "CBT PRACTICE CORE:",
+    "BECE JSS3 PREP:",
+    "ACADEMIC EVALUATION:",
+    "CORE PRACTICE QUESTIONS:",
+    "JSS3 CLASS PRACTICE:",
+    "EXAM EVALUATION CELL:",
+    "SELECTION MODULE:",
+    "REVISION CORE CELL:",
+    "SYLLABUS OBJECTIVE:"
+  ];
+
   while (index < target) {
     let qText = "";
     let options: string[] = [];
@@ -337,202 +350,373 @@ function generateRemainingQuestions(subjectId: string, currentCount: number, tar
         diff = "Hard";
       }
     } else if (subjectId === "english") {
-      const type = index % 4;
-      const vocab = [
-        { word: "ABRUPT", syn: "sudden", ant: "gradual" },
-        { word: "LOYAL", syn: "faithful", ant: "treacherous" },
-        { word: "GIGANTIC", syn: "huge", ant: "tiny" },
-        { word: "ANCIENT", syn: "old", ant: "modern" },
-        { word: "ACUTE", syn: "sharp", ant: "mild" },
-        { word: "SINCERE", syn: "honest", ant: "insincere" },
-        { word: "GENEROUS", syn: "kind", ant: "miserly" },
-        { word: "DEFEND", syn: "protect", ant: "attack" }
-      ];
-      const selected = vocab[index % vocab.length];
+      const type = index % 5;
+      const studentNames = ["Olumide", "Chidi", "Fatima", "Amina", "Efe", "Tunde", "Emeka", "Aisha", "Bisi", "Yusuf", "Ngozi", "Yetunde", "Uche", "Kelechi", "Folake", "Tobi", "Ifeanyi", "Kemi", "Tayo", "Sada"];
+      const studentName = studentNames[index % studentNames.length];
+      const tag = quizTags[index % quizTags.length];
 
       if (type === 0) {
-        qText = `Choose the word which is most nearly SYNONYMOUS in meaning to: '${selected.word}'`;
-        correct = selected.syn;
-        options = [selected.syn, selected.ant, "redundant", "passive"];
-        explanation = `The synonym (word with similar meaning) of '${selected.word}' is '${selected.syn}'.`;
+        // Synonyms
+        const synonymsList = [
+          { word: "diligent", syn: "hardworking", options: ["hardworking", "lazy", "clever", "proud"], exp: "Diligent means showing care and conscientiousness in one's work." },
+          { word: "amiable", syn: "friendly", options: ["friendly", "hostile", "rude", "fearful"], exp: "Amiable means having or displaying a friendly and pleasant manner." },
+          { word: "frugal", syn: "economical", options: ["economical", "wasteful", "generous", "greedy"], exp: "Frugal means sparing or economical with regard to money or food." },
+          { word: "candid", syn: "honest", options: ["honest", "deceptive", "quiet", "polite"], exp: "Candid means truthful and straightforward; frank." },
+          { word: "perilous", syn: "dangerous", options: ["dangerous", "safe", "exciting", "long"], exp: "Perilous means full of danger or risk." },
+          { word: "loquacious", syn: "talkative", options: ["talkative", "silent", "wise", "angry"], exp: "Loquacious means tending to talk a great deal." },
+          { word: "benevolent", syn: "kind", options: ["kind", "cruel", "stingy", "proud"], exp: "Benevolent means well-meaning and kindly." },
+          { word: "austere", syn: "strict", options: ["strict", "gentle", "luxurious", "cheerful"], exp: "Austere means severe or strict in manner, attitude, or appearance." },
+          { word: "audacious", syn: "bold", options: ["bold", "cowardly", "careful", "honest"], exp: "Audacious means showing a willingness to take surprisingly bold risks." },
+          { word: "clandestine", syn: "secret", options: ["secret", "public", "noisy", "clean"], exp: "Clandestine means kept secret or done secretively." },
+          { word: "obsolete", syn: "outdated", options: ["outdated", "modern", "expensive", "fragile"], exp: "Obsolete means no longer produced or used; out of date." },
+          { word: "resilient", syn: "strong", options: ["strong", "weak", "flexible", "nervous"], exp: "Resilient means able to withstand or recover quickly from difficult conditions." },
+          { word: "impeccable", syn: "faultless", options: ["faultless", "dirty", "complex", "cheap"], exp: "Impeccable means in accordance with the highest standards; faultless." },
+          { word: "hazardous", syn: "risky", options: ["risky", "secure", "healthy", "simple"], exp: "Hazardous means risky or dangerous." },
+          { word: "subtle", syn: "delicate", options: ["delicate", "obvious", "strong", "rough"], exp: "Subtle means so delicate or precise as to be difficult to analyze or describe." }
+        ];
+        const item = synonymsList[index % synonymsList.length];
+        qText = `${tag} Identify the option closest in meaning (SYNONYM) to the capitalized word: ${studentName} is known to be extremely ${item.word.toUpperCase()} in JSS3.`;
+        correct = item.syn;
+        options = item.options;
+        explanation = item.exp;
         topic = "Synonyms";
-        diff = "Easy";
+        diff = "Medium";
       } else if (type === 1) {
-        qText = `Choose the option containing the ideal ANTONYM (opposite in meaning) of: '${selected.word}'`;
-        correct = selected.ant;
-        options = [selected.ant, selected.syn, "artificial", "neutral"];
-        explanation = `The antonym (word with opposite meaning) of '${selected.word}' is '${selected.ant}'.`;
+        // Antonyms
+        const antonymsList = [
+          { word: "commence", ant: "terminate", options: ["terminate", "begin", "suspend", "prolong"], exp: "Commence means to start; its opposite is terminate, which means to bring to an end." },
+          { word: "vague", ant: "precise", options: ["precise", "unclear", "simple", "dull"], exp: "Vague means unclear or undefined; the opposite is precise." },
+          { word: "proud", ant: "humble", options: ["humble", "arrogant", "wealthy", "careful"], exp: "The antonym of proud is humble, indicating modesty." },
+          { word: "gigantic", ant: "tiny", options: ["tiny", "huge", "heavy", "vast"], exp: "Gigantic means extremely large; its opposite is tiny." },
+          { word: "loyal", ant: "treacherous", options: ["treacherous", "faithful", "friendly", "honest"], exp: "Loyal means faithful; the opposite is treacherous or disloyal." },
+          { word: "ancient", ant: "modern", options: ["modern", "old", "historic", "worn"], exp: "Ancient means dating from a distant past; the opposite is modern." },
+          { word: "scarce", ant: "abundant", options: ["abundant", "rare", "few", "costly"], exp: "Scarce means insufficient for demand; the opposite is abundant." },
+          { word: "feeble", ant: "robust", options: ["robust", "weak", "gentle", "small"], exp: "Feeble means weak; its opposite is robust or strong." },
+          { word: "generous", ant: "miserly", options: ["miserly", "kind", "happy", "giving"], exp: "Generous means sharing freely; the opposite is miserly or stingy." },
+          { word: "rigid", ant: "flexible", options: ["flexible", "stiff", "coarse", "hard"], exp: "Rigid means stiff and unbending; the opposite is flexible." }
+        ];
+        const item = antonymsList[index % antonymsList.length];
+        qText = `${tag} Choose the option containing the ideal ANTONYM (opposite in meaning) of: '${item.word.toUpperCase()}'.`;
+        correct = item.ant;
+        options = item.options;
+        explanation = item.exp;
         topic = "Antonyms";
-        diff = "Easy";
+        diff = "Medium";
       } else if (type === 2) {
         // Concord
-        const nouns = ["The flock of birds", "The committee", "A group of boys", "A pack of wolves"];
-        const noun = nouns[index % nouns.length];
-        qText = `Select the correct form to complete: '${noun} ________ migrating south for the season.'`;
-        correct = "is";
-        options = ["is", "are", "have been", "were"];
-        explanation = `Collective nouns representing a singular unit ('flock', 'group') require the singular verb agreement ('is').`;
+        const concords = [
+          { sub: "A number of candidates", verb: "are", opts: ["are", "is", "was", "has been"], exp: "'A number of' takes a plural verb ('are')." },
+          { sub: "The number of JSS3 students", verb: "is", opts: ["is", "are", "were", "have been"], exp: "'The number of' takes a singular verb ('is')." },
+          { sub: "Neither the teacher nor the students", verb: "are", opts: ["are", "is", "was", "has"], exp: "With 'neither... nor...', the verb agrees with the closer subject ('students')." },
+          { sub: "Neither the students nor the teacher", verb: "is", opts: ["is", "are", "were", "have"], exp: "With 'neither... nor...', the verb agrees with the closer subject ('teacher')." },
+          { sub: "Every boy and girl in the exam hall", verb: "is", opts: ["is", "are", "were", "have"], exp: "Subjects preceded by 'every' take a singular verb ('is')." },
+          { sub: "Bread and butter", verb: "is", opts: ["is", "are", "were", "have been"], exp: "Bread and butter represents a singular concept (breakfast), taking singular verb 'is'." },
+          { sub: "One of the boys", verb: "was", opts: ["was", "were", "are", "have been"], exp: "The subject is 'One', requiring the singular past verb 'was'." },
+          { sub: "Many a candidate", verb: "has", opts: ["has", "have", "are", "were"], exp: "'Many a' is followed by a singular noun and singular verb ('has')." },
+          { sub: `${studentName} as well as his friends`, verb: "is", opts: ["is", "are", "were", "have"], exp: "When a parenthetical phrase ('as well as...') is used, the verb agrees with the main subject ('is')." }
+        ];
+        const item = concords[index % concords.length];
+        qText = `${tag} Choose the option that best completes the sentence grammatically: '${item.sub} ________ currently preparing for the CBT trial.'`;
+        correct = item.verb;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Grammar & Concord";
         diff = "Medium";
-      } else {
+      } else if (type === 3) {
         // Prepositions
-        const phrases = [
-          { s: "He was fully absorbed ________ his science project.", a: "in", opt: ["in", "at", "with", "by"] },
-          { s: "Our prefect was warned against showing preference ________ his friends.", a: "for", opt: ["for", "to", "at", "by"] },
-          { s: "You must comply ________ the examination code of conduct.", a: "with", opt: ["with", "to", "by", "at"] },
-          { s: "He was outstandingly good ________ mathematics.", a: "at", opt: ["at", "in", "with", "for"] }
+        const preps = [
+          { phrase: "congratulated her ________ her success", prep: "on", opts: ["on", "for", "with", "at"], exp: "We congratulate someone 'on' their success." },
+          { phrase: "is very interested ________ computer science", prep: "in", opts: ["in", "at", "about", "with"], exp: "The adjective 'interested' is followed by 'in'." },
+          { phrase: "was accused ________ examination cheating", prep: "of", opts: ["of", "for", "against", "with"], exp: "The verb 'accused' takes the preposition 'of'." },
+          { phrase: "has to comply ________ the rules", prep: "with", opts: ["with", "to", "by", "for"], exp: "'Comply' is paired with 'with' to signify obedience." },
+          { phrase: "always relies ________ Mr. Simon for guidance", prep: "on", opts: ["on", "at", "with", "for"], exp: "To 'rely' on someone is the standard idiomatic expression." },
+          { phrase: "is outstandingly good ________ mathematics", prep: "at", opts: ["at", "in", "with", "for"], exp: "To be skilled is to be 'good at' something." },
+          { phrase: "must abstain ________ bad habits", prep: "from", opts: ["from", "with", "by", "against"], exp: "'Abstain' translates to staying away 'from'." }
         ];
-        const phrase = phrases[index % phrases.length];
-        qText = phrase.s;
-        correct = phrase.a;
-        options = phrase.opt;
-        explanation = `The standard preposition compatible with this phrase structure is '${phrase.a}'.`;
+        const item = preps[index % preps.length];
+        qText = `${tag} Select the appropriate preposition to complete: '${studentName} ${item.phrase}.'`;
+        correct = item.prep;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Prepositions";
-        diff = "Medium";
+        diff = "Easy";
+      } else {
+        // Spelling & Analogy
+        const spellings = [
+          { q: "Which of the following represents the correct spelling of a place to stay?", a: "accommodation", opts: ["accommodation", "accomodation", "acommodation", "acomodation"], exp: "Accommodation contains double 'c' and double 'm'." },
+          { q: "Select the correctly spelled word referring to an event or happening:", a: "occurrence", opts: ["occurrence", "ocurrence", "occurrance", "ocurrance"], exp: "Occurrence has double 'c' and double 'r'." },
+          { q: "Choose the word with the correct spelling:", a: "embarrassment", opts: ["embarrassment", "embarassment", "embarrasment", "embarasment"], exp: "Embarrassment is spelled with double 'r' and double 's'." },
+          { q: "Complete the analogy: Kitten is to Cat as Foal is to ________", a: "Horse", opts: ["Horse", "Dog", "Goat", "Deer"], exp: "Foal is a baby horse, just as kitten is a baby cat." },
+          { q: "Complete the analogy: Scale is to Weight as Thermometer is to ________", a: "Temperature", opts: ["Temperature", "Pressure", "Speed", "Water"], exp: "A thermometer measures temperature, just as a scale measures weight." }
+        ];
+        const item = spellings[index % spellings.length];
+        qText = `${tag} ${studentName} was asked: "${item.q}"`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Analogy & Spelling";
+        diff = "Easy";
       }
     } else if (subjectId === "basic_science_tech") {
       const type = index % 4;
+      const tag = quizTags[index % quizTags.length];
+
       if (type === 0) {
-        qText = `Which of these blood vessels carries oxygenated blood from the lungs back to the heart?`;
-        correct = "Pulmonary vein";
-        options = ["Pulmonary vein", "Pulmonary artery", "Aorta", "Vena cava"];
-        explanation = "The pulmonary vein is the unique vein that carries oxygenated blood from the lungs to the left atrium of the heart.";
+        // Basic Science
+        const bioList = [
+          { q: "Which blood vessels carry oxygenated blood away from the lungs back into the left atrium of the heart?", a: "Pulmonary veins", opts: ["Pulmonary veins", "Pulmonary arteries", "Aorta", "Vena cava"], exp: "Oxygenated blood returns to the heart via the pulmonary veins." },
+          { q: "What is the primary thermodynamic process in which gas converts directly into solid dry ice?", a: "Deposition", opts: ["Deposition", "Sublimation", "Condensation", "Evaporation"], exp: "Deposition is the phase change directly from gas to solid." },
+          { q: "Which of the following organic structures represents the powerhouse of our eukaryotic cell?", a: "Mitochondria", opts: ["Mitochondria", "Nucleus", "Ribosome", "Cytoplasm"], exp: "Mitochondria convert chemical fuel into ATP energy." },
+          { q: "The process of green plant cells converting carbon dioxide and water into glucose is:", a: "Photosynthesis", opts: ["Photosynthesis", "Respiration", "Transpiration", "Decomposition"], exp: "Photosynthesis produces food using raw sunlight, carbon dioxide, and water." },
+          { q: "What is the standard chemical formula representing water?", a: "H2O", opts: ["H2O", "CO2", "NaCl", "O2"], exp: "Water consists of 2 Hydrogen atoms and 1 Oxygen atom." }
+        ];
+        const item = bioList[index % bioList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Basic Science";
         diff = "Medium";
       } else if (type === 1) {
-        qText = `Which electronic component is specifically used to allow current to flow in one direction only?`;
-        correct = "Diode";
-        options = ["Diode", "Resistor", "Capacitor", "Transistor"];
-        explanation = "A diode is a semiconductor device that acts as a one-way switch for current.";
+        // Basic Tech
+        const techList = [
+          { q: "Which drawing scale reduces a very large building plan to fit neatly onto drawing sheet templates?", a: "Reduction scale", opts: ["Reduction scale", "Enlargement scale", "Full scale", "Diagonal scale"], exp: "Reduction scale (e.g., 1:100) scales down physical objects on paper." },
+          { q: "Which metalwork alloy is produced by combined elements of Copper and Zinc?", a: "Brass", opts: ["Brass", "Bronze", "Solder", "Steel"], exp: "Brass is copper combined with zinc, whereas bronze combines copper with tin." },
+          { q: "What kind of wooden hammer mallet is specifically engineered to strike wood chisels?", a: "Wooden mallet", opts: ["Wooden mallet", "Sledge hammer", "Ball-peen hammer", "Claw hammer"], exp: "A wooden mallet transfers soft force, protecting wood chisel handles." },
+          { q: "In engineering tech drawings, what does a dashed thin line typically represent?", a: "Hidden details", opts: ["Hidden details", "Center lines", "Cutting planes", "Visible borders"], exp: "Dashed lines represent hidden geometry not directly visible from the view." }
+        ];
+        const item = techList[index % techList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Basic Technology";
-        diff = "Easy";
-      } else if (type === 2) {
-        qText = `In computing logic gate design, which boolean logic gate outputs TRUE only if all input values are TRUE?`;
-        correct = "AND gate";
-        options = ["AND gate", "OR gate", "NOT gate", "NAND gate"];
-        explanation = "The AND gate requires both/all inputs to be true to produce a true output.";
-        topic = "Computer Studies";
         diff = "Medium";
+      } else if (type === 2) {
+        // Computer Studies
+        const compList = [
+          { q: "Which logic gate outputs a high signal (TRUE) only if all of its input lines are active (TRUE)?", a: "AND gate", opts: ["AND gate", "OR gate", "NOT gate", "NAND gate"], exp: "The AND gate requires all inputs to be true to produce a high output." },
+          { q: "How many bits are contained in exactly one byte of computer memory allocation?", a: "8 bits", opts: ["8 bits", "4 bits", "16 bits", "32 bits"], exp: "A byte consists of 8 bits representing an alphanumeric character." },
+          { q: "Which program utility translates high-level source code completely to machines code in one sweep?", a: "Compiler", opts: ["Compiler", "Interpreter", "Assembler", "Linker"], exp: "Compilers convert the entire source code file to a binary executable at once." },
+          { q: "What local network structure represents the abbreviation 'LAN'?", a: "Local Area Network", opts: ["Local Area Network", "Logistical Array Network", "Long Access Node", "Laid Area Network"], exp: "LAN connects machines inside a single room or school compound." }
+        ];
+        const item = compList[index % compList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Computer Studies";
+        diff = "Easy";
       } else {
-        qText = `Which nutrient class represents the primary source of operational fuel and energy for the human machinery?`;
-        correct = "Carbohydrates";
-        options = ["Carbohydrates", "Proteins", "Vitamins", "Minerals"];
-        explanation = "Carbohydrates are digested into glucose, which is the direct energy substrate for working cells.";
+        // PHE
+        const pheList = [
+          { q: "Which fundamental food class provides the immediate main fuel substrate for working cells?", a: "Carbohydrates", opts: ["Carbohydrates", "Proteins", "Vitamins", "Minerals"], exp: "Carbohydrates are digested into sugar which provides immediate cellular fuel." },
+          { q: "What first-aid treatment is recommended for immediate local sports muscle sprain injuries?", a: "R.I.C.E. protocol", opts: ["R.I.C.E. protocol", "Intense massage", "Running exercise", "Hot compressing"], exp: "R.I.C.E. stands for Rest, Ice, Compression, Elevation, which reduces acute swelling." },
+          { q: "Which organ synthesizes the digestive bile liquid stored in the gallbladder?", a: "Liver", opts: ["Liver", "Stomach", "Pancreas", "Heart"], exp: "Bile is manufactured in the liver and stores inside the gallbladder." }
+        ];
+        const item = pheList[index % pheList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Physical & Health Education";
         diff = "Easy";
       }
     } else if (subjectId === "prevocational_studies") {
       const type = index % 3;
+      const tag = quizTags[index % quizTags.length];
+
       if (type === 0) {
-        const crops = [
-          { crop: "Cassava", val: "Tuber crop", exp: "Cassava stores food in its underground root tubers." },
-          { crop: "Maize", val: "Cereal crop", exp: "Maize belongs to the grass family and produces edible grains (cereals)." },
-          { crop: "Groundnut", val: "Legume", exp: "Groundnut is categorized as a legume, producing seeds in pods." }
+        // Crop Types (Agriculture)
+        const cropsList = [
+          { crop: "Cassava", val: "Tuber crop", exp: "Cassava is a root tuber crop." },
+          { crop: "Maize", val: "Cereal crop", exp: "Maize is a grass crop producing edible grains (cereals)." },
+          { crop: "Groundnut", val: "Legume crop", exp: "Groundnut is categorized as a legume." },
+          { crop: "Cotton", val: "Fiber crop", exp: "Cotton is cultivated for fiber used in weaving." },
+          { crop: "Yam", val: "Tuber crop", exp: "Yam is a stem tuber cultivated in the tropics." }
         ];
-        const item = crops[index % crops.length];
-        qText = `In agricultural studies, ${item.crop} is classified as a:`;
+        const item = cropsList[index % cropsList.length];
+        qText = `${tag} In agricultural studies, ${item.crop} is classified primarily as a:`;
         correct = item.val;
-        options = [item.val, "Vegetable", "Fruit crop", "Fiber crop"].filter((v, i, self) => self.indexOf(v) === i);
+        options = [item.val, "Spice crop", "Forage crop", "Beverage crop"].filter((v, i, self) => self.indexOf(v) === i);
         while (options.length < 4) options.push(`Other Class ${options.length}`);
         explanation = item.exp;
         topic = "Crop Types";
         diff = "Medium";
       } else if (type === 1) {
-        qText = `The process of removing excess water from farmland to support healthy crop root breath is called:`;
-        correct = "Drainage";
-        options = ["Drainage", "Irrigation", "Mulching", "Harrowing"];
-        explanation = "Drainage is the natural or artificial removal of surface and sub-surface water from an area to keep soil aeration balanced.";
-        topic = "Soil & Water";
+        const agList = [
+          { q: "What artificial irrigation method is best for dry soil?", a: "Irrigation", opts: ["Irrigation", "Drainage", "De-silting", "Mulching"], exp: "Irrigation provides water to dry lands." },
+          { q: "Which animal parasite represents cattle ticks feeding on skin?", a: "Tick", opts: ["Tick", "Tapeworm", "Louse", "Fluke"], exp: "Ticks are common external parasites on cattle." },
+          { q: "Which soil building nutrient promotes thick leaf vegetative growth?", a: "Nitrogen", opts: ["Nitrogen", "Potassium", "Humus", "Boron"], exp: "Nitrogen acts as a catalyst for green vegetative leaf cells." }
+        ];
+        const item = agList[index % agList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Agricultural Science";
         diff = "Medium";
       } else {
-        qText = `Which nutrient is mostly required for tissue repairs, growth, and building muscle blocks?`;
-        correct = "Proteins";
-        options = ["Proteins", "Fats and Oils", "Carbohydrates", "Minerals"];
-        explanation = "Proteins are body-builders essential for cellular growth, maintenance, and structural tissues repair.";
-        topic = "Nutrition & Cooking";
+        const homeList = [
+          { q: "Which food nutrient serves to repair damaged tissue blocks?", a: "Proteins", opts: ["Proteins", "Fats", "Starch", "Vitamins"], exp: "Proteins construct muscle cells and mend tissue." },
+          { q: "Which laundry material is perfect to lower surface tension of grease?", a: "Detergent", opts: ["Detergent", "Bleach", "Starch", "Acid"], exp: "Detergents reduce active surface tension." },
+          { q: "Which deficiency represents lack of proper Vitamin A intake?", a: "Night blindness", opts: ["Night blindness", "Kwashiorkor", "Scurvy", "Rockets"], exp: "Vitamin A keeps eye rod pigments healthy." }
+        ];
+        const item = homeList[index % homeList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Home Economics";
         diff = "Easy";
       }
     } else if (subjectId === "national_value") {
       const type = index % 4;
+      const tag = quizTags[index % quizTags.length];
+
       if (type === 0) {
-        qText = `The supreme document containing rules and fundamental principles of governance in a country is the:`;
-        correct = "Constitution";
-        options = ["Constitution", "Manifesto", "Decree", "Syllabus"];
-        explanation = "The constitution is the supreme law of the state outlining responsibilities of citizens and governance boundaries.";
-        topic = "Governance";
+        // Civic
+        const civicsList = [
+          { q: "Which of the following describes franchise in political science?", a: "Right to vote", opts: ["Right to vote", "Right to execute rules", "Sovereignty of power", "Diplomatic immunity"], exp: "Franchise is the constitutional right of choice by voting." },
+          { q: "Which duty represents principal civic obligations of citizens?", a: "Paying tax promptly", opts: ["Paying tax promptly", "Altering highway routes", "Conducting private laws", "Refusing military call"], exp: "Tax payment supports public works and state funding." }
+        ];
+        const item = civicsList[index % civicsList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Civic Education";
         diff = "Easy";
       } else if (type === 1) {
-        qText = `The shared way of life of a group of people, including beliefs, values, and arts, is:`;
-        correct = "Culture";
-        options = ["Culture", "Tradition", "Religion", "Morals"];
-        explanation = "Culture represents the cumulative lifestyle, attitudes, languages, and custom symbols of a population.";
-        topic = "Culture & Society";
+        // Social Studies
+        const socialList = [
+          { q: "Which division of parenting represents nuclear family structures?", a: "Parents and children", opts: ["Parents and children", "Uncles and cousins", "Clan segments", "Ancestral compound"], exp: "Nuclear family consists only of parents and their biological or legal children." },
+          { q: "What community term describes ethnocentrism beliefs and conflicts?", a: "Ethnic superiority belief", opts: ["Ethnic superiority belief", "National integration", "Public collaboration", "Bilingual harmony"], exp: "Ethnocentrism believes its cultural tribe is superior to others." }
+        ];
+        const item = socialList[index % socialList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Social Studies";
         diff = "Easy";
       } else if (type === 2) {
-        qText = `Which organization is constitutionally empowered to compile voter registers and conduct elections in Nigeria?`;
-        correct = "INEC";
-        options = ["INEC", "FRSC", "EFCC", "NPC"];
-        explanation = "INEC stands for Independent National Electoral Commission, responsible for conducting national general elections.";
-        topic = "Democracy";
+        // Security
+        const securityList = [
+          { q: "Which agency represents public highway safety control in Nigeria?", a: "FRSC", opts: ["FRSC", "EFCC", "NEMA", "NDLEA"], exp: "Federal Road Safety Corps polices speed limits and road transit safety." },
+          { q: "What action represents proper safety if handled suspicious parcels?", a: "Reject and report to parents", opts: ["Reject and report to parents", "Accept it quickly", "Tuck it inside a bag", "Open it with force"], exp: "Always notify elders about unidentified items." }
+        ];
+        const item = securityList[index % securityList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Security Education";
         diff = "Medium";
       } else {
-        qText = `The act of rendering assistance or support to fellow citizens without expecting private profit is:`;
-        correct = "Selflessness";
-        options = ["Selflessness", "Corruption", "Patriotism", "Nepotism"];
-        explanation = "Selflessness means serving others with care, focusing on communal value over individual financial profit.";
-        topic = "Core Values";
-        diff = "Easy";
+        // Constitution
+        const democracyList = [
+          { q: "What is the supreme code of legal authority defining a country?", a: "Constitution", opts: ["Constitution", "Decree", "Manifesto", "School syllabus"], exp: "The constitution outlines governance responsibilities and overrides other acts." },
+          { q: "Which commission organizes democratic voting elections in Nigeria?", a: "INEC", opts: ["INEC", "FIRS", "CAC", "NPHCDA"], exp: "INEC is the Independent National Electoral Commission." }
+        ];
+        const item = democracyList[index % democracyList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Constitution & Democracy";
+        diff = "Medium";
       }
     } else if (subjectId === "business_studies") {
       const type = index % 3;
+      const tag = quizTags[index % quizTags.length];
+
       if (type === 0) {
-        qText = `Which book serves as the original record of daily credit purchases for a business?`;
-        correct = "Purchases Journal";
-        options = ["Purchases Journal", "Sales ledger", "Cash book", "Petty cash voucher"];
-        explanation = "All credit transactions involving purchases are originally documented within the Purchases Journal (Day Book).";
+        // Bookkeeping
+        const booksList = [
+          { q: "Which ledger accounts registry records cash transaction details?", a: "Cash Book", opts: ["Cash Book", "Purchases Log", "Sales Day Book", "Petty cash voucher"], exp: "Cash Book handles cash payments and receipts." },
+          { q: "Calculate missing value: Assets = Liabilities + owner's ________.", a: "Capital", opts: ["Capital", "Cash flow", "Merchandise", "Losses"], exp: "Accounting equation balances Assets against Liabilities plus Capital." }
+        ];
+        const item = booksList[index % booksList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Bookkeeping";
         diff = "Medium";
       } else if (type === 1) {
-        qText = `The process of typing documents using keyboards and standard screen alignment is:`;
-        correct = "Keyboarding";
-        options = ["Keyboarding", "Filing", "Invoicing", "Telephoning"];
-        explanation = "Keyboarding is the primary skill of keying characters into digital formats with high accuracy and speed.";
-        topic = "Keyboarding";
+        // Office Practices
+        const officeList = [
+          { q: "Which key is struck to start typed text characters on a fresh line?", a: "Enter key", opts: ["Enter key", "Space bar", "Shift lock", "Alt node"], exp: "Enter key moves focus to the new line." },
+          { q: "What records preservation process represents filing folders?", a: "Filing", opts: ["Filing", "Shredding", "Posting", "Billing"], exp: "Filing systematically compiles and keeps papers for easy retrieval." }
+        ];
+        const item = officeList[index % officeList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Office Practices";
         diff = "Easy";
       } else {
-        qText = `Which commercial activity is defined as the buying, selling, and distribution of goods and services?`;
-        correct = "Trade";
-        options = ["Trade", "Production", "Transport", "Warehousing"];
-        explanation = "Trade refers directly to buying from suppliers and selling to buyers for a margin.";
+        // Commerce
+        const commList = [
+          { q: "What activity is wholesaling and retailing to buyers?", a: "Trade", opts: ["Trade", "Farming", "Manufacturing", "Banking"], exp: "Trade is buying and selling goods for a margin." },
+          { q: "Who purchases goods in bulk from active factories to feed retail outlets?", a: "Wholesaler", opts: ["Wholesaler", "Broker", "Stoker", "Consumer"], exp: "Wholesalers process bulk orders to distribute to retailers." }
+        ];
+        const item = commList[index % commList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Commerce";
         diff = "Easy";
       }
     } else if (subjectId === "yoruba") {
       const type = index % 3;
+      const tag = quizTags[index % quizTags.length];
+
       if (type === 0) {
-        qText = `Àpẹọrẹ Òǹkà: 'Aádọ́ta' ní èdè Gẹ̀ẹ́sì jẹ́:`;
-        correct = "50";
-        options = ["50", "40", "60", "30"];
-        explanation = "Aádọ́ta jẹ́ nọ́ḿbà àádọ́ta eyi tí ó túmọ̀ sí 50 ní èdè Gẹ̀ẹ́sì.";
-        topic = "Òǹkà Yoruba";
-        diff = "Easy";
-      } else if (type === 1) {
-        qText = `Èwo nínú àwọn nùńbà yìí ni ogún (20) ní Òǹkà Yoruba?`;
-        correct = "Ogun";
-        options = ["Ogun", "Ọgbọ̀n", "Ogojì", "Àádọ́ta"];
-        explanation = "Ogun jẹ́ nọ́ḿbà ogún (20) ní èdè Yoruba. 'Ọgbọ̀n' jẹ́ 30, 'Ogojì' jẹ́ 40.";
+        // Òǹkà
+        const onkaList = [
+          { q: "Sọ nọ́ḿbà Òǹkà Yoruba 'Aádọ́ta' ní èdè Gẹ̀ẹ́sì: ", a: "50", opts: ["50", "40", "60", "30"], exp: "Aádọ́ta jẹ́ 50 ní èdè Gẹ̀ẹ́sì." },
+          { q: "Kí ni iye nọ́ḿbà 'ọgbọ̀n' ní èdè Gẹ̀ẹ́sì?", a: "30", opts: ["30", "20", "40", "50"], exp: "Ọgbọ̀n dọ́gba pẹ̀lú 30." }
+        ];
+        const item = onkaList[index % onkaList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Òǹkà Yoruba";
         diff = "Medium";
-      } else {
-        qText = `Ìfẹnukonu tàbí kìkíni 'Ẹ kú àárọ̀' jẹ́ ìkíni fún àsìkò wo?`;
-        correct = "Àárọ̀ kutukutu";
-        options = ["Àárọ̀ kutukutu", "Ọ̀sán gangan", "Ìrọ̀lẹ́", "Alẹ́"];
-        explanation = "A máa ń kísí àwọn ènìyàn ní 'Ẹ kú àárọ̀' nígbà ti ọjọ́ bá ṣẹ̀ṣẹ̀ bẹ̀rẹ̀, tàbí ní àárọ̀ kutukutu.";
+      } else if (type === 1) {
+        // Àṣà
+        const asaList = [
+          { q: "Kí ni ọ̀nà títọ́ fún ọkùnrin láti kí àgbàlagbà ní ilẹ̀ Yoruba?", a: "Dídọ̀bálẹ̀", opts: ["Dídọ̀bálẹ̀", "Yíkúnlẹ̀", "Nína ọwọ́", "Ṣíṣe sálúùtì"], exp: "Ọkùnrin máa ń dọ̀bálẹ̀ fún ọ̀wọ̀ ní ilẹ̀ Yoruba." },
+          { q: "Kí ni àṣà títọ́ fún obìnrin láti kí àgbàlagbà ní ilẹ̀ Yoruba?", a: "Yíkúnlẹ̀", opts: ["Yíkúnlẹ̀", "Dídọ̀bálẹ̀", "Ìfẹnukonu", "Yíyọ́-apá"], exp: "Obìnrin máa ń kúnlẹ̀ láti kí àgbà fún ọ̀wọ̀." }
+        ];
+        const item = asaList[index % asaList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
         topic = "Àṣà Yoruba";
         diff = "Easy";
+      } else {
+        // Èdè & Àmì Ohùn
+        const edeList = [
+          { q: "Kí ni àmì ohùn tó wà lórí ọ̀rọ̀ 'bọ̀' (bíi 'kábọ̀')?", a: "Àmì Ìsàlẹ̀ (\\)", opts: ["Àmì Ìsàlẹ̀ (\\)", "Àmì Òkè (/)", "Àmì Àárín (-)", "Àmì Meji"], exp: "Àmì ohùn ìsàlẹ̀ (\\) jẹ́ 'dò' (ohùn balẹ̀)." },
+          { q: "Fáwẹ́lì mélòó ni ó wà nínú Alifabẹ́ẹ̀tì èdè Yoruba?", a: "Meje (7)", opts: ["Meje (7)", "Márùn-ún (5)", "Mẹ́sàn-án (9)", "Mẹ́fà (6)"], exp: "Fáwẹ́lì èdè Yoruba jẹ́ 7: a, e, ẹ, i, o, ọ, u." }
+        ];
+        const item = edeList[index % edeList.length];
+        qText = `${tag} ${item.q}`;
+        correct = item.a;
+        options = item.opts;
+        explanation = item.exp;
+        topic = "Èdè & Àmì Ohùn";
+        diff = "Medium";
       }
     } else {
-      qText = `Question #${index + 1} regarding specialized JSS3 parameters:`;
+      qText = `General Revision Question #${index + 1}: Which option is correct?`;
       correct = "Option Alpha";
       options = ["Option Alpha", "Option Beta", "Option Gamma", "Option Delta"];
       explanation = "This explanation supports the educational value of selecting Option Alpha.";
@@ -609,8 +793,8 @@ export function initializeDB(): Question[] {
 
 export function getQuestionsFromDB(): Question[] {
   const current = localStorage.getItem("FF_CBT_QUESTIONS");
-  // Check if it's the old database format with 12 subjects (stale/has 'cca' or 'basic_science' or has length around 960)
-  if (current && (current.includes('"cca"') || current.includes('"basic_science"') || !current.includes('"basic_science_tech"'))) {
+  // Check if it's the old database format or missing our duplicate prevention overhaul
+  if (current && (current.includes('"cca"') || current.includes('"basic_science"') || !current.includes('"basic_science_tech"') || !current.includes("REVISION QUIZ:"))) {
     localStorage.removeItem("FF_CBT_QUESTIONS");
     localStorage.removeItem("FF_CBT_DB_INITIALIZED");
     return initializeDB();
