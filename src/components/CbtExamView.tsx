@@ -33,16 +33,22 @@ export default function CbtExamView({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Calculator State (specific to JSS3 Math CBT)
+  // Calculator State & Features (specific to JSS3 Math CBT)
   const [showCalculator, setShowCalculator] = useState(config.subjectId === "maths");
   const [calcInput, setCalcInput] = useState("");
   const [calcResult, setCalcResult] = useState("");
+
+  // Draggable State for the Calculator
+  const [calcPosition, setCalcPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const positionStartRef = useRef({ x: 0, y: 0 });
 
   const handleCalcInput = (char: string) => {
     setCalcInput((prev) => {
       let base = prev;
       if (calcResult !== "") {
-        if (/^[0-9.(]$/.test(char)) {
+        if (/^[0-9.(]$/.test(char) || char === "3.14159") {
           base = "";
         } else {
           base = calcResult;
@@ -51,6 +57,58 @@ export default function CbtExamView({
       }
       return base + char;
     });
+  };
+
+  const handleUnaryOperator = (op: "SQRT" | "SQUARE" | "PERCENT") => {
+    let currentVal = 0;
+    if (calcResult !== "") {
+      currentVal = parseFloat(calcResult);
+    } else {
+      if (!calcInput) return;
+      try {
+        const expr = calcInput
+          .replace(/×/g, "*")
+          .replace(/÷/g, "/")
+          .replace(/−/g, "-");
+        
+        if (/^[0-9+\-*/.()\s]*$/.test(expr)) {
+          const res = new Function(`return (${expr})`)();
+          if (res !== undefined && !isNaN(res)) {
+            currentVal = res;
+          } else {
+            setCalcResult("Error");
+            return;
+          }
+        } else {
+          setCalcResult("Error");
+          return;
+        }
+      } catch (e) {
+        setCalcResult("Error");
+        return;
+      }
+    }
+
+    if (op === "SQRT") {
+      if (currentVal < 0) {
+        setCalcResult("Error");
+      } else {
+        const newVal = Math.sqrt(currentVal);
+        const rounded = parseFloat(newVal.toFixed(8));
+        setCalcResult(String(rounded));
+        setCalcInput(`√(${currentVal})`);
+      }
+    } else if (op === "SQUARE") {
+      const newVal = currentVal * currentVal;
+      const rounded = parseFloat(newVal.toFixed(8));
+      setCalcResult(String(rounded));
+      setCalcInput(`(${currentVal})²`);
+    } else if (op === "PERCENT") {
+      const newVal = currentVal / 100;
+      const rounded = parseFloat(newVal.toFixed(8));
+      setCalcResult(String(rounded));
+      setCalcInput(`(${currentVal})%`);
+    }
   };
 
   const handleCalcAction = (action: "CLEAR" | "BACKSPACE" | "EVALUATE") => {
@@ -84,6 +142,94 @@ export default function CbtExamView({
       }
     }
   };
+
+  // Keyboard support for official CBT mathematical inputs
+  useEffect(() => {
+    if (config.subjectId !== "maths" || !showCalculator) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.getAttribute("contenteditable") === "true")) {
+        return;
+      }
+
+      const key = e.key;
+      if (/^[0-9.()]$/.test(key)) {
+        e.preventDefault();
+        handleCalcInput(key);
+      } else if (key === "+") {
+        e.preventDefault();
+        handleCalcInput("+");
+      } else if (key === "-") {
+        e.preventDefault();
+        handleCalcInput("−");
+      } else if (key === "*") {
+        e.preventDefault();
+        handleCalcInput("×");
+      } else if (key === "/") {
+        e.preventDefault();
+        handleCalcInput("÷");
+      } else if (key === "Enter" || key === "=") {
+        e.preventDefault();
+        handleCalcAction("EVALUATE");
+      } else if (key === "Backspace") {
+        e.preventDefault();
+        handleCalcAction("BACKSPACE");
+      } else if (key === "Escape" || key === "c" || key === "C") {
+        e.preventDefault();
+        handleCalcAction("CLEAR");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [config.subjectId, showCalculator, calcInput, calcResult]);
+
+  // Floating Drag Handlers
+  const startDrag = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    
+    setIsDragging(true);
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    
+    dragStartRef.current = { x: clientX, y: clientY };
+    positionStartRef.current = { ...calcPosition };
+  };
+
+  useEffect(() => {
+    const handleDragMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDragging) return;
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+      
+      const dx = clientX - dragStartRef.current.x;
+      const dy = clientY - dragStartRef.current.y;
+      
+      setCalcPosition({
+        x: positionStartRef.current.x + dx,
+        y: positionStartRef.current.y + dy
+      });
+    };
+
+    const handleDragEnd = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleDragMove);
+      window.addEventListener("mouseup", handleDragEnd);
+      window.addEventListener("touchmove", handleDragMove);
+      window.addEventListener("touchend", handleDragEnd);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleDragMove);
+      window.removeEventListener("mouseup", handleDragEnd);
+      window.removeEventListener("touchmove", handleDragMove);
+      window.removeEventListener("touchend", handleDragEnd);
+    };
+  }, [isDragging]);
 
   const totalTimeSeconds = config.duration * 60;
   const currentSubject = SUBJECTS.find((s) => s.id === config.subjectId);
@@ -511,179 +657,31 @@ export default function CbtExamView({
             </div>
           </div>
 
-          {/* CALCULATOR PANEL FOR MATHS */}
-          {config.subjectId === "maths" && showCalculator && (
-            <div
-              className={`p-5 rounded-3xl border ${darkMode ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"} shadow-sm space-y-4`}
-            >
-              <div className="flex items-center justify-between border-b pb-2.5 border-slate-100 dark:border-slate-800">
+          {/* CALCULATOR INFO PANEL FOR MATHS */}
+            {config.subjectId === "maths" && (
+              <div
+                className={`p-4.5 rounded-2xl border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} shadow-sm space-y-3.5`}
+              >
                 <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-                  <LucideIcon name="Calculator" size={14} />
-                  <span className="font-bold text-[10px] uppercase tracking-wider">CBT Math Calculator</span>
+                  <LucideIcon name="Calculator" size={15} />
+                  <span className="font-bold text-[10px] uppercase tracking-wider font-serif">DESK CALCULATION PORT</span>
                 </div>
+                <p className={`text-[11px] leading-relaxed ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
+                  A standard electronic desk calculator with roots, percentages, and keyboard support is active for this Mathematics examination.
+                </p>
                 <button
-                  onClick={() => setShowCalculator(false)}
-                  className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                  title="Close Calculator"
+                  onClick={() => setShowCalculator((prev) => !prev)}
+                  className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs ${
+                    showCalculator
+                      ? "bg-rose-500/10 border-rose-500/20 text-rose-500 hover:bg-rose-500/20"
+                      : "bg-indigo-600 text-white border-indigo-650 hover:bg-indigo-700 animate-pulse"
+                  }`}
                 >
-                  <LucideIcon name="X" size={13} />
+                  <LucideIcon name="Calculator" size={13} />
+                  <span>{showCalculator ? "Hide Math Calculator" : "Show Math Calculator"}</span>
                 </button>
               </div>
-
-              {/* Calc Screen */}
-              <div className="bg-slate-950 dark:bg-black rounded-xl p-3 text-right font-mono space-y-1 shadow-inner border border-slate-800/20">
-                <div className="text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap scrollbar-none h-4 min-h-4">
-                  {calcInput || "0"}
-                </div>
-                <div className="text-base font-bold text-indigo-400 overflow-x-auto whitespace-nowrap scrollbar-none">
-                  {calcResult !== "" ? `= ${calcResult}` : calcInput !== "" ? calcInput.split(/([+\-×÷])/).pop() || "0" : "0"}
-                </div>
-              </div>
-
-              {/* Keypad */}
-              <div className="grid grid-cols-4 gap-2 text-xs font-mono">
-                {/* Row 1 */}
-                <button
-                  onClick={() => handleCalcAction("CLEAR")}
-                  className="py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl active:scale-95 transition-all text-center cursor-pointer"
-                >
-                  C
-                </button>
-                <button
-                  onClick={() => handleCalcInput("(")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-800 hover:bg-slate-700" : "bg-slate-100 hover:bg-slate-200"} text-slate-700 dark:text-slate-300 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  (
-                </button>
-                <button
-                  onClick={() => handleCalcInput(")")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-800 hover:bg-slate-700" : "bg-slate-100 hover:bg-slate-200"} text-slate-700 dark:text-slate-300 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  )
-                </button>
-                <button
-                  onClick={() => handleCalcInput("÷")}
-                  className="py-2.5 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer"
-                >
-                  ÷
-                </button>
-
-                {/* Row 2 */}
-                <button
-                  onClick={() => handleCalcInput("7")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  7
-                </button>
-                <button
-                  onClick={() => handleCalcInput("8")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  8
-                </button>
-                <button
-                  onClick={() => handleCalcInput("9")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  9
-                </button>
-                <button
-                  onClick={() => handleCalcInput("×")}
-                  className="py-2.5 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer"
-                >
-                  ×
-                </button>
-
-                {/* Row 3 */}
-                <button
-                  onClick={() => handleCalcInput("4")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  4
-                </button>
-                <button
-                  onClick={() => handleCalcInput("5")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  5
-                </button>
-                <button
-                  onClick={() => handleCalcInput("6")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  6
-                </button>
-                <button
-                  onClick={() => handleCalcInput("−")}
-                  className="py-2.5 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer"
-                >
-                  −
-                </button>
-
-                {/* Row 4 */}
-                <button
-                  onClick={() => handleCalcInput("1")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  1
-                </button>
-                <button
-                  onClick={() => handleCalcInput("2")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  2
-                </button>
-                <button
-                  onClick={() => handleCalcInput("3")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  3
-                </button>
-                <button
-                  onClick={() => handleCalcInput("+")}
-                  className="py-2.5 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer"
-                >
-                  +
-                </button>
-
-                {/* Row 5 */}
-                <button
-                  onClick={() => handleCalcInput("0")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  0
-                </button>
-                <button
-                  onClick={() => handleCalcInput(".")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-950 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/90"} text-slate-800 dark:text-slate-200 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer`}
-                >
-                  .
-                </button>
-                <button
-                  onClick={() => handleCalcAction("BACKSPACE")}
-                  className={`py-2.5 ${darkMode ? "bg-slate-800 hover:bg-slate-700" : "bg-slate-100 hover:bg-slate-200"} text-slate-700 dark:text-slate-300 font-semibold rounded-xl active:scale-95 transition-all text-center cursor-pointer flex items-center justify-center`}
-                >
-                  <LucideIcon name="CornerUpLeft" size={13} />
-                </button>
-                <button
-                  onClick={() => handleCalcAction("EVALUATE")}
-                  className="py-2.5 bg-emerald-600 text-white font-black rounded-xl hover:bg-emerald-700 active:scale-95 transition-all text-center cursor-pointer"
-                >
-                  =
-                </button>
-              </div>
-            </div>
-          )}
-
-          {config.subjectId === "maths" && !showCalculator && (
-            <button
-              onClick={() => setShowCalculator(true)}
-              className="w-full py-3 bg-indigo-50/50 dark:bg-slate-900 border border-indigo-100 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100/30 dark:hover:bg-slate-800 font-bold rounded-2xl text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-            >
-              <LucideIcon name="Calculator" size={14} />
-              <span>Open CBT Calculator</span>
-            </button>
-          )}
+            )}
 
           {/* PROGRESS CARD */}
           <div className={`p-4 rounded-2xl border ${darkMode ? "bg-slate-900 border-slate-800/80" : "bg-indigo-50/30 border-indigo-100"} space-y-2.5 shadow-sm`}>
@@ -728,6 +726,226 @@ export default function CbtExamView({
           </div>
         )}
       </AnimatePresence>
+
+      {/* PROFESSIONAL DRAGGABLE FLOATING CALCULATOR MODAL */}
+      {config.subjectId === "maths" && showCalculator && (
+        <div
+          style={{
+            transform: `translate(${calcPosition.x}px, ${calcPosition.y}px)`,
+          }}
+          className={`fixed bottom-24 right-4 sm:right-8 w-80 rounded-3xl border shadow-2xl z-40 select-none overflow-hidden transition-shadow ${
+            isDragging ? "shadow-indigo-500/10 cursor-grabbing border-indigo-550" : "cursor-grab border-slate-250 dark:border-slate-800"
+          } ${darkMode ? "bg-slate-900/95 backdrop-blur-md" : "bg-white/95 backdrop-blur-md"}`}
+        >
+          {/* Header */}
+          <div
+            onMouseDown={startDrag}
+            onTouchStart={startDrag}
+            className="p-3.5 bg-indigo-900 text-white flex items-center justify-between cursor-move active:cursor-move select-none"
+          >
+            <div className="flex items-center gap-2">
+              <LucideIcon name="Calculator" size={15} className="text-indigo-200 animate-pulse" />
+              <span className="font-bold text-[10px] tracking-widest uppercase font-serif">BECE Official Calculator</span>
+            </div>
+            <div className="flex items-center gap-1.5 no-print">
+              <button
+                onClick={() => setCalcPosition({ x: 0, y: 0 })}
+                className="p-1 rounded-lg hover:bg-white/10 text-indigo-200 hover:text-white transition-colors cursor-pointer"
+                title="Reset Position"
+              >
+                <LucideIcon name="RefreshCw" size={12} />
+              </button>
+              <button
+                onClick={() => setShowCalculator(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-indigo-200 hover:text-white transition-colors cursor-pointer"
+                title="Hide Calculator"
+              >
+                <LucideIcon name="X" size={12} />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4.5 space-y-3.5">
+            {/* Screen */}
+            <div className="bg-slate-950 dark:bg-black rounded-2xl p-3.5 text-right font-mono space-y-1 shadow-inner border border-slate-800/40 relative overflow-hidden">
+              <div className="text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap scrollbar-none h-4 min-h-4">
+                {calcInput || "0"}
+              </div>
+              <div className="text-lg font-bold text-indigo-400 overflow-x-auto whitespace-nowrap scrollbar-none">
+                {calcResult !== "" ? `= ${calcResult}` : calcInput !== "" ? calcInput.split(/([+\-×÷])/).pop() || "0" : "0"}
+              </div>
+              {/* Little label indicating Keyboard is active */}
+              <div className="absolute left-2.5 bottom-1 text-[7px] text-slate-500 uppercase tracking-widest pointer-events-none font-bold">
+                Keyboard Active
+              </div>
+            </div>
+
+            {/* Keypad */}
+            <div className="grid grid-cols-4 gap-1.5 text-xs font-semibold font-mono">
+              {/* Row 1 */}
+              <button
+                onClick={() => handleCalcAction("CLEAR")}
+                className="py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-450 font-bold rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+              >
+                C
+              </button>
+              <button
+                onClick={() => handleCalcInput("(")}
+                className={`py-2 ${darkMode ? "bg-slate-800 hover:bg-slate-700" : "bg-slate-100 hover:bg-slate-200"} text-slate-700 dark:text-slate-350 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                (
+              </button>
+              <button
+                onClick={() => handleCalcInput(")")}
+                className={`py-2 ${darkMode ? "bg-slate-800 hover:bg-slate-700" : "bg-slate-100 hover:bg-slate-205"} text-slate-700 dark:text-slate-350 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                )
+              </button>
+              <button
+                onClick={() => handleCalcInput("÷")}
+                className="py-2 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+              >
+                ÷
+              </button>
+
+              {/* Row 2 */}
+              <button
+                onClick={() => handleCalcInput("7")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                7
+              </button>
+              <button
+                onClick={() => handleCalcInput("8")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                8
+              </button>
+              <button
+                onClick={() => handleCalcInput("9")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                9
+              </button>
+              <button
+                onClick={() => handleCalcInput("×")}
+                className="py-2 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+              >
+                ×
+              </button>
+
+              {/* Row 3 */}
+              <button
+                onClick={() => handleCalcInput("4")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                4
+              </button>
+              <button
+                onClick={() => handleCalcInput("5")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                5
+              </button>
+              <button
+                onClick={() => handleCalcInput("6")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                6
+              </button>
+              <button
+                onClick={() => handleCalcInput("−")}
+                className="py-2 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+              >
+                −
+              </button>
+
+              {/* Row 4 */}
+              <button
+                onClick={() => handleCalcInput("1")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                1
+              </button>
+              <button
+                onClick={() => handleCalcInput("2")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                2
+              </button>
+              <button
+                onClick={() => handleCalcInput("3")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                3
+              </button>
+              <button
+                onClick={() => handleCalcInput("+")}
+                className="py-2 bg-indigo-650 text-white font-bold rounded-xl hover:bg-indigo-700 active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+              >
+                +
+              </button>
+
+              {/* Row 5 */}
+              <button
+                onClick={() => handleCalcInput("0")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                0
+              </button>
+              <button
+                onClick={() => handleCalcInput(".")}
+                className={`py-2 ${darkMode ? "bg-slate-950/60 hover:bg-slate-800" : "bg-slate-50 hover:bg-slate-200/80"} text-slate-800 dark:text-slate-200 rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-2xs`}
+              >
+                .
+              </button>
+              <button
+                onClick={() => handleCalcAction("BACKSPACE")}
+                className={`py-2 ${darkMode ? "bg-slate-850 hover:bg-slate-700" : "bg-slate-100 hover:bg-slate-200"} text-slate-700 dark:text-slate-300 rounded-xl active:scale-95 transition-all text-center cursor-pointer flex items-center justify-center shadow-xs`}
+                title="Backspace"
+              >
+                <LucideIcon name="CornerUpLeft" size={13} />
+              </button>
+              <button
+                onClick={() => handleCalcAction("EVALUATE")}
+                className="py-2 bg-emerald-600 text-white font-black rounded-xl hover:bg-emerald-700 active:scale-95 transition-all text-center cursor-pointer shadow-md"
+              >
+                =
+              </button>
+
+              {/* Row 6: Advanced Academic Ops for JSS3 Maths */}
+              <button
+                onClick={() => handleUnaryOperator("SQRT")}
+                className="py-2 bg-indigo-705/10 hover:bg-indigo-700/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+                title="Square Root"
+              >
+                √
+              </button>
+              <button
+                onClick={() => handleUnaryOperator("SQUARE")}
+                className="py-2 bg-indigo-705/10 hover:bg-indigo-700/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+                title="Square (x²)"
+              >
+                x²
+              </button>
+              <button
+                onClick={() => handleUnaryOperator("PERCENT")}
+                className="py-2 bg-indigo-705/10 hover:bg-indigo-700/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+                title="Percentage"
+              >
+                %
+              </button>
+              <button
+                onClick={() => handleCalcInput("3.14159")}
+                className="py-2 bg-indigo-705/10 hover:bg-indigo-700/20 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl active:scale-95 transition-all text-center cursor-pointer shadow-xs"
+                title="Pi (3.14159)"
+              >
+                π
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
