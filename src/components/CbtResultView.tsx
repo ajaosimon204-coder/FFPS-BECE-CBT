@@ -44,6 +44,43 @@ export default function CbtResultView({
     return isQuestionBookmarked(user.id, qId);
   };
 
+  const handleDownloadTxtReport = () => {
+    let textRep = `FAITH FOUNDATION SCHOOLS\n`;
+    textRep += `==================================================\n`;
+    textRep += `OFFICIAL JSS3 BECE COMPUTER BASED TESTING SLIP\n`;
+    textRep += `SESSION ID  : ${result.id}\n`;
+    textRep += `DATE EXECUTED   : ${new Date(result.date).toLocaleString()}\n`;
+    textRep += `==================================================\n`;
+    textRep += `\nCANDIDATE STUDY PARTICULARS:\n`;
+    textRep += `Candidate Name  : ${user.fullName.toUpperCase()}\n`;
+    textRep += `Reg ID Number   : ${result.studentRegId}\n`;
+    textRep += `Syllabus Subject: ${result.subjectName}\n`;
+    textRep += `Exam Format Type: ${result.isMock ? "TIMED MOCK PRACTICE" : "UNTIMED PRACTICE LEARNING"}\n`;
+    textRep += `--------------------------------------------------\n`;
+    textRep += `\nPERFORMANCE INDEX SUMMARY:\n`;
+    textRep += `Grade Assigned  : ${result.grade}\n`;
+    textRep += `Total percentage: ${result.percentage}%\n`;
+    textRep += `Count Graded    : ${result.correctAnswers} / ${result.totalQuestions} Answered Correctly\n`;
+    textRep += `Duration Expended: ${formatSeconds(result.timeUsed)}\n`;
+    textRep += `--------------------------------------------------\n`;
+    textRep += `\nDETAILED REVIEW CORRECTIONS:\n`;
+    if (result.corrections) {
+      result.corrections.forEach((c, index) => {
+        textRep += `\n[QUESTION ${index + 1}] Topic: ${c.topic || "General"}\n`;
+        textRep += `Question: ${c.questionText}\n`;
+        textRep += `Candidate Response: ${c.studentAnswer}\n`;
+        textRep += `Correct Response: ${c.correctAnswer}\n`;
+        textRep += `Indicator: ${c.isCorrect ? "PASSED/CORRECT" : "FAILED/WRONG"}\n`;
+        textRep += `Correction: ${c.explanation}\n`;
+      });
+    }
+    const blob = new Blob([textRep], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `FF_BECE_Report_${user.fullName.replace(/\s+/g, "_")}_${result.subjectId}.txt`;
+    link.click();
+  };
+
   // Grade styling mapper
   const gradeStyles = {
     A: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-2 border-emerald-500/30", label: "A - Excellent (Distinction)" },
@@ -69,13 +106,23 @@ export default function CbtResultView({
             <LucideIcon name="ArrowLeft" size={13} /> Return to Home
           </button>
 
-          <button
-            onClick={() => window.print()}
-            className="px-6 py-2.5 bg-indigo-600 border border-indigo-700 dark:border-transparent dark:bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
-            id="print-receipt-btn"
-          >
-            <LucideIcon name="Printer" size={13} /> Print Report Slip
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownloadTxtReport}
+              className={`px-5 py-2.5 border rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-500/15 transition-colors flex items-center gap-1.5 cursor-pointer border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 shadow-xs`}
+              id="download-txt-report-btn"
+            >
+              <LucideIcon name="Download" size={13} /> Saved Report (.txt)
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              className="px-6 py-2.5 bg-indigo-600 border border-indigo-700 dark:border-transparent dark:bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              id="print-receipt-btn"
+            >
+              <LucideIcon name="Printer" size={13} /> Print Report Slip
+            </button>
+          </div>
         </div>
 
         {/* OFFICIAL SCHOOL SLIP TEMPLATE IN WEB VIEW */}

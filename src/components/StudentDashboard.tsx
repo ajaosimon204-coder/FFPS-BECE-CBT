@@ -64,6 +64,47 @@ export default function StudentDashboard({
     setSelectedSubject(null);
   };
 
+  const handleDownloadResultText = (result: Result) => {
+    let textRep = `FAITH FOUNDATION SCHOOLS\n`;
+    textRep += `==================================================\n`;
+    textRep += `OFFICIAL JSS3 BECE COMPUTER BASED TESTING SLIP\n`;
+    textRep += `SESSION ID  : ${result.id}\n`;
+    textRep += `DATE EXECUTED   : ${new Date(result.date).toLocaleString()}\n`;
+    textRep += `==================================================\n`;
+    textRep += `\nCANDIDATE STUDY PARTICULARS:\n`;
+    textRep += `Candidate Name  : ${user.fullName.toUpperCase()}\n`;
+    textRep += `Reg ID Number   : ${result.studentRegId}\n`;
+    textRep += `Syllabus Subject: ${result.subjectName}\n`;
+    textRep += `Exam Format Type: ${result.isMock ? "TIMED MOCK PRACTICE" : "UNTIMED PRACTICE LEARNING"}\n`;
+    textRep += `--------------------------------------------------\n`;
+    textRep += `\nPERFORMANCE INDEX SUMMARY:\n`;
+    textRep += `Grade Assigned  : ${result.grade}\n`;
+    textRep += `Total percentage: ${result.percentage}%\n`;
+    textRep += `Count Graded    : ${result.correctAnswers} / ${result.totalQuestions} Answered Correctly\n`;
+    
+    const mins = Math.floor(result.timeUsed / 60);
+    const secs = result.timeUsed % 60;
+    const durStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    textRep += `Duration Expended: ${durStr}\n`;
+    textRep += `--------------------------------------------------\n`;
+    textRep += `\nDETAILED REVIEW CORRECTIONS:\n`;
+    if (result.corrections) {
+      result.corrections.forEach((c: any, index: number) => {
+        textRep += `\n[QUESTION ${index + 1}] Topic: ${c.topic || "General"}\n`;
+        textRep += `Question: ${c.questionText}\n`;
+        textRep += `Candidate Response: ${c.studentAnswer || "Omitted / Unanswered"}\n`;
+        textRep += `Correct Response: ${c.correctAnswer}\n`;
+        textRep += `Indicator: ${c.isCorrect ? "PASSED/CORRECT" : "FAILED/WRONG"}\n`;
+        textRep += `Correction: ${c.explanation || "No explanation attached"}\n`;
+      });
+    }
+    const blob = new Blob([textRep], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `FF_BECE_Report_${user.fullName.replace(/\s+/g, "_")}_${result.subjectId}.txt`;
+    link.click();
+  };
+
   const handleSimulatePwaInstall = () => {
     const act = confirm("Would you like to install FAITH FOUNDATION CBT to your home screen for rapid offline launching and offline question access?");
     if (act) {
@@ -327,10 +368,17 @@ export default function StudentDashboard({
                           </td>
                           <td className="p-3.5 text-slate-400 font-mono text-[11px]">{new Date(res.date).toLocaleDateString()}</td>
                           <td className="p-3.5 text-right">
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleDownloadResultText(res)}
+                                className="px-2.5 py-1.5 border border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-[10px] tracking-wide transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                                title="Download detailed report (.txt)"
+                              >
+                                <LucideIcon name="Download" size={11} /> Download
+                              </button>
                               <button
                                 onClick={() => onViewResultCorrections(res)}
-                                className="px-3 py-1.5 bg-indigo-600 dark:bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs tracking-wide shadow-sm transition-all cursor-pointer"
+                                className="px-3 py-1.5 bg-indigo-600 dark:bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs tracking-wide shadow-sm transition-all cursor-pointer shrink-0"
                               >
                                 Corrections Desk
                               </button>

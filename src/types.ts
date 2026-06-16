@@ -22,6 +22,7 @@ export interface Question {
   explanation: string;
   difficulty: "Easy" | "Medium" | "Hard";
   topic: string;
+  isUploaded?: boolean;
 }
 
 export interface Subject {

@@ -268,7 +268,7 @@ export default function App() {
                     onClick={() => handleCredentialShortcut("ADMIN")}
                     className="px-3 py-1.5 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold tracking-wider rounded-lg hover:border-purple-500 hover:bg-purple-50/20 dark:hover:bg-purple-950/20 transition-all text-purple-600 dark:text-purple-400 cursor-pointer"
                   >
-                    👑 Mrs. Sarah (Admin)
+                    👑 Mr. Simon (Admin)
                   </button>
                 </div>
               </div>

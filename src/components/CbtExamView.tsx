@@ -249,9 +249,17 @@ export default function CbtExamView({
     });
     const uniqueSubjectQ = Array.from(uniqueQMap.values());
     
-    // Random select 'questionCount' number of questions
-    const shuffled = [...uniqueSubjectQ].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, Math.min(config.questionCount, shuffled.length));
+    // Prioritize spreadsheet/Excel-uploaded questions ("mostly picked and shown")
+    const uploadedQ = uniqueSubjectQ.filter((q) => q.isUploaded);
+    const regularQ = uniqueSubjectQ.filter((q) => !q.isUploaded);
+
+    // Shuffle both subsets independently to keep randomness within types
+    const shuffledUploaded = [...uploadedQ].sort(() => 0.5 - Math.random());
+    const shuffledRegular = [...regularQ].sort(() => 0.5 - Math.random());
+
+    // Merge them: uploaded first, then regular questions backfill
+    const mergedQ = [...shuffledUploaded, ...shuffledRegular];
+    const selected = mergedQ.slice(0, Math.min(config.questionCount, mergedQ.length));
 
     // Process options shuffling for each question
     const processed = selected.map((q) => {

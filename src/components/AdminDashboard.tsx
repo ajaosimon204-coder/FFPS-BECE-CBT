@@ -38,11 +38,18 @@ export default function AdminDashboard({
   darkMode,
   setDarkMode
 }: AdminDashboardProps) {
-  const [activeSegment, setActiveSegment] = useState<"stats" | "bank" | "logs">("stats");
+  const [activeSegment, setActiveSegment] = useState<"stats" | "bank" | "results" | "logs">("stats");
   const [questions, setQuestions] = useState<Question[]>(getQuestionsFromDB());
+  const [results, setResults] = useState<any[]>(getResultsFromDB());
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [activityLogs, setActivityLogs] = useState<any[]>(getActivityLogs());
+
+  // Result view filter states
+  const [resultSearchQuery, setResultSearchQuery] = useState("");
+  const [resultFilterSubject, setResultFilterSubject] = useState("");
+  const [resultFilterMode, setResultFilterMode] = useState<string>("all");
+  const [selectedResultDetail, setSelectedResultDetail] = useState<any | null>(null);
 
   // Edit / Add MODALS
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -72,6 +79,7 @@ export default function AdminDashboard({
   const [fileImportError, setFileImportError] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [activeImportTab, setActiveImportTab] = useState<"file" | "paste">("file");
+  const [importSubjectOverride, setImportSubjectOverride] = useState<string>("auto");
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -142,18 +150,22 @@ export default function AdminDashboard({
           const qVal = String(row[qIdx] || "").trim();
           if (!qVal) continue;
 
-          let rawSub = subIdx !== -1 && row[subIdx] ? String(row[subIdx]).trim().toLowerCase() : "maths";
           let subjectId = "maths";
-          if (rawSub.includes("math")) subjectId = "maths";
-          else if (rawSub.includes("english")) subjectId = "english";
-          else if (rawSub.includes("basic science") || rawSub.includes("science_tech") || rawSub.includes("basic_science") || rawSub.includes("tech")) subjectId = "basic_science_tech";
-          else if (rawSub.includes("prevocational") || rawSub.includes("prevoc") || rawSub.includes("agric")) subjectId = "prevocational_studies";
-          else if (rawSub.includes("national") || rawSub.includes("civic")) subjectId = "national_value";
-          else if (rawSub.includes("business")) subjectId = "business_studies";
-          else if (rawSub.includes("yoruba")) subjectId = "yoruba";
-          else {
-            const match = SUBJECTS.find((s) => s.id === rawSub);
-            if (match) subjectId = match.id;
+          if (importSubjectOverride !== "auto") {
+            subjectId = importSubjectOverride;
+          } else {
+            let rawSub = subIdx !== -1 && row[subIdx] ? String(row[subIdx]).trim().toLowerCase() : "maths";
+            if (rawSub.includes("math")) subjectId = "maths";
+            else if (rawSub.includes("english")) subjectId = "english";
+            else if (rawSub.includes("basic science") || rawSub.includes("science_tech") || rawSub.includes("basic_science") || rawSub.includes("tech")) subjectId = "basic_science_tech";
+            else if (rawSub.includes("prevocational") || rawSub.includes("prevoc") || rawSub.includes("agric")) subjectId = "prevocational_studies";
+            else if (rawSub.includes("national") || rawSub.includes("civic")) subjectId = "national_value";
+            else if (rawSub.includes("business")) subjectId = "business_studies";
+            else if (rawSub.includes("yoruba")) subjectId = "yoruba";
+            else {
+              const match = SUBJECTS.find((s) => s.id === rawSub);
+              if (match) subjectId = match.id;
+            }
           }
 
           const aVal = optA !== -1 && row[optA] !== undefined ? String(row[optA]).trim() : "";
@@ -218,6 +230,7 @@ export default function AdminDashboard({
       return {
         ...q,
         id: dbId,
+        isUploaded: true, // Prioritize this custom Excel upload!
         originalOptions: [...q.options]
       };
     });
@@ -239,7 +252,7 @@ export default function AdminDashboard({
     setTimeout(() => setFileImportSuccess(""), 5000);
   };
 
-  const resultsList = getResultsFromDB();
+  const resultsList = results;
   const studentsStr = localStorage.getItem("FF_CBT_USERS") || "[]";
   const users = JSON.parse(studentsStr);
   const studentsCount = users.filter((u: any) => u.role === "STUDENT").length;
@@ -247,6 +260,7 @@ export default function AdminDashboard({
   const handleRefreshDB = () => {
     setQuestions(getQuestionsFromDB());
     setActivityLogs(getActivityLogs());
+    setResults(getResultsFromDB());
   };
 
   const handleOpenAdd = () => {
@@ -368,7 +382,24 @@ export default function AdminDashboard({
 
         if (cols.length < 3) continue;
 
-        const subjectVal = subIdx !== -1 && cols[subIdx] ? cols[subIdx] : "maths";
+        let subjectVal = "maths";
+        if (importSubjectOverride !== "auto") {
+          subjectVal = importSubjectOverride;
+        } else {
+          const rawCol = subIdx !== -1 && cols[subIdx] ? cols[subIdx].trim().toLowerCase() : "maths";
+          if (rawCol.includes("math")) subjectVal = "maths";
+          else if (rawCol.includes("english")) subjectVal = "english";
+          else if (rawCol.includes("basic science") || rawCol.includes("science_tech") || rawCol.includes("basic_science") || rawCol.includes("tech")) subjectVal = "basic_science_tech";
+          else if (rawCol.includes("prevocational") || rawCol.includes("prevoc") || rawCol.includes("agric")) subjectVal = "prevocational_studies";
+          else if (rawCol.includes("national") || rawCol.includes("civic")) subjectVal = "national_value";
+          else if (rawCol.includes("business")) subjectVal = "business_studies";
+          else if (rawCol.includes("yoruba")) subjectVal = "yoruba";
+          else {
+            const match = SUBJECTS.find((s) => s.id === rawCol);
+            if (match) subjectVal = match.id;
+          }
+        }
+
         const qVal = cols[qIdx];
         const aVal = cols[optA];
         const bVal = cols[optB];
@@ -393,7 +424,8 @@ export default function AdminDashboard({
           correctAnswer: ansVal,
           explanation: expVal,
           difficulty: diffVal,
-          topic: topicVal
+          topic: topicVal,
+          isUploaded: true
         });
 
         addedCount++;
@@ -557,6 +589,12 @@ export default function AdminDashboard({
             className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "bank" ? "border-indigo-600 text-indigo-650 dark:text-indigo-450" : "border-transparent text-slate-405 hover:text-slate-600"}`}
           >
             <LucideIcon name="HelpCircle" size={13} /> Question Bank ({questions.length})
+          </button>
+          <button
+            onClick={() => setActiveSegment("results")}
+            className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "results" ? "border-indigo-600 text-indigo-650 dark:text-indigo-400 font-bold" : "border-transparent text-slate-405 hover:text-slate-600"}`}
+          >
+            <LucideIcon name="Award" size={13} /> Student Exam Results ({results.length})
           </button>
           <button
             onClick={() => setActiveSegment("logs")}
@@ -887,6 +925,28 @@ export default function AdminDashboard({
                     </button>
                   </div>
 
+                  {/* Subject Override Assignment (Upload for specific subjects one after another) */}
+                  <div className="bg-slate-100/40 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/80 space-y-1.5 shadow-xs">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                      <LucideIcon name="Settings" size={10} /> Target JSS3 Subject Destination
+                    </label>
+                    <select
+                      value={importSubjectOverride}
+                      onChange={(e) => setImportSubjectOverride(e.target.value)}
+                      className="w-full px-2.5 py-2.5 rounded-lg border text-xs font-black uppercase tracking-wider outline-none bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 transition-all focus:border-blue-500"
+                    >
+                      <option value="auto">🔍 Auto-detect from "Subject" column</option>
+                      {SUBJECTS.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          🎯 {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
+                      Select a specific subject to upload custom questions for <strong>one after the other</strong>, or let the engine auto-detect.
+                    </p>
+                  </div>
+
                   {activeImportTab === "file" ? (
                     <div className="space-y-4">
                       <p className="text-[11px] text-slate-400 leading-normal font-bold">
@@ -989,13 +1049,19 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
                         className={`p-5 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800/80" : "bg-white border-slate-200"} space-y-3 text-xs`}
                       >
                         <div className="flex justify-between items-start">
-                          <div className="flex gap-2 uppercase font-black text-[9px] tracking-wider">
+                          <div className="flex flex-wrap gap-2 uppercase font-black text-[9px] tracking-wider">
                             <span className="bg-blue-900/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-md border border-blue-500/10">
                               {q.subjectId}
                             </span>
                             <span className="bg-purple-900/10 text-purple-600 dark:text-purple-400 px-2.5 py-1 rounded-md border border-purple-500/10">
                               {q.topic}
                             </span>
+                            {q.isUploaded && (
+                              <span className="bg-emerald-950/15 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-md border border-emerald-500/20 font-black flex items-center gap-1.5 active-badge">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-450 animate-ping"></span>
+                                PRIORITY IMPORT
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex gap-3 text-[10px] font-black uppercase tracking-wider">
@@ -1036,6 +1102,347 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
               </div>
             </div>
           )}
+
+          {/* STUDENT CBT EXAM RESULTS PANEL */}
+          {activeSegment === "results" && (() => {
+            const filteredResults = results.filter((res) => {
+              const matchesSearch =
+                res.studentName.toLowerCase().includes(resultSearchQuery.toLowerCase()) ||
+                res.studentRegId.toLowerCase().includes(resultSearchQuery.toLowerCase()) ||
+                res.subjectName.toLowerCase().includes(resultSearchQuery.toLowerCase()) ||
+                res.grade.toLowerCase() === resultSearchQuery.trim().toLowerCase();
+
+              const matchesSubject = resultFilterSubject ? res.subjectId === resultFilterSubject : true;
+              const matchesMode = resultFilterMode === "all" ? true : resultFilterMode === "mock" ? res.isMock === true : res.isMock === false;
+
+              return matchesSearch && matchesSubject && matchesMode;
+            });
+
+            // Calculate metrics for filtered set
+            const filteredTotal = filteredResults.length;
+            const filteredPassed = filteredResults.filter(r => r.percentage >= 50).length;
+            const filteredPassRate = filteredTotal > 0 ? Math.round((filteredPassed / filteredTotal) * 100) : 0;
+
+            const handleDeleteResult = (idToDelete: string) => {
+              if (confirm("Are you sure you want to delete this candidate result permanently?")) {
+                const updated = results.filter(r => r.id !== idToDelete);
+                setResults(updated);
+                localStorage.setItem("FF_CBT_RESULTS", JSON.stringify(updated));
+                logActivity(user.id, user.fullName, UserRole.ADMIN, "Delete CBT Result", `Permanently removed student result record ID: ${idToDelete}.`);
+              }
+            };
+
+            const formatDuration = (totalSeconds: number) => {
+              const mins = Math.floor(totalSeconds / 60);
+              const secs = totalSeconds % 60;
+              return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+            };
+
+            return (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                      <LucideIcon name="Award" className="text-purple-600 dark:text-purple-400" /> JSS3 CBT Candidate Results
+                    </h3>
+                    <p className="text-xs font-bold text-slate-400">Review, search, analyze, and manage score slips for all completed exams</p>
+                  </div>
+
+                  <button
+                    onClick={handleExportResultsCSV}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                    id="export-csv-btn"
+                  >
+                    <LucideIcon name="FileSpreadsheet" size={13} /> Export All to Excel/CSV
+                  </button>
+                </div>
+
+                {/* Filter and search headers */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-2 relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-405">
+                      <LucideIcon name="Search" size={14} />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search Candidate, Registration ID, Subject name or Grade (e.g. A)..."
+                      value={resultSearchQuery}
+                      onChange={(e) => setResultSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border text-xs font-semibold outline-none bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-705 transition-all focus:border-indigo-500 shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <select
+                      value={resultFilterSubject}
+                      onChange={(e) => setResultFilterSubject(e.target.value)}
+                      className="w-full px-3 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider outline-none bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-650 transition-all focus:border-indigo-500 shadow-xs"
+                    >
+                      <option value="">🎯 FILTER BY ALL SUBJECTS</option>
+                      {SUBJECTS.map((sub) => (
+                        <option key={sub.id} value={sub.id}>{sub.name.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <select
+                      value={resultFilterMode}
+                      onChange={(e) => setResultFilterMode(e.target.value)}
+                      className="w-full px-3 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider outline-none bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-650 transition-all focus:border-indigo-500 shadow-xs"
+                    >
+                      <option value="all">📝 ALL EXAM FORMATS</option>
+                      <option value="mock">⏱️ TIMED MOCK TESTS</option>
+                      <option value="practice">⚡ UNTIMED PRACTICE</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Micro Stats Row */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className={`p-4 rounded-xl border ${darkMode ? "bg-slate-900/60 border-slate-800/80" : "bg-white border-slate-200"} text-center`}>
+                    <div className="text-xl font-bold font-mono text-indigo-650 dark:text-indigo-400">{filteredTotal}</div>
+                    <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Filtered Records</div>
+                  </div>
+                  <div className={`p-4 rounded-xl border ${darkMode ? "bg-slate-900/60 border-slate-800/80" : "bg-white border-slate-200"} text-center`}>
+                    <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-450">{filteredPassed}</div>
+                    <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Passed (Score &ge; 50%)</div>
+                  </div>
+                  <div className={`p-4 rounded-xl border ${darkMode ? "bg-slate-900/60 border-slate-800/80" : "bg-white border-slate-200"} text-center`}>
+                    <div className="text-xl font-bold font-mono text-amber-500">{filteredPassRate}%</div>
+                    <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Pass Rate Percentage</div>
+                  </div>
+                </div>
+
+                {filteredResults.length === 0 ? (
+                  <div className={`text-center py-16 rounded-2xl border-2 border-dashed ${darkMode ? "border-slate-800" : "border-slate-250"}`}>
+                    <LucideIcon name="History" size={36} className="text-slate-400 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-slate-600 dark:text-slate-350">No results found matching conditions</p>
+                    <p className="text-xs text-slate-400 mt-1">Try adjusting the filters or clean the search search queries above.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border-2 border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm bg-white dark:bg-slate-905">
+                    <table className="w-full text-left text-xs">
+                      <thead className={`text-[10px] uppercase tracking-wider font-semibold ${darkMode ? "bg-slate-900 text-slate-400 border-b border-slate-800" : "bg-slate-50 text-slate-500 border-b border-slate-200"}`}>
+                        <tr>
+                          <th className="p-3.5 border-r dark:border-slate-800">Candidate Particulars</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Subject</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Format</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Answers Correct</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Result Mark</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Date Logged</th>
+                          <th className="p-3.5 text-center">Action Console</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-150 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
+                        {filteredResults.map((res) => (
+                          <tr key={res.id} className="hover:bg-slate-100/30 dark:hover:bg-slate-900/10 transition-colors">
+                            <td className="p-3.5">
+                              <div className="font-bold text-slate-950 dark:text-white">{res.studentName}</div>
+                              <div className="text-[10px] text-slate-400 font-mono font-semibold uppercase">{res.studentRegId}</div>
+                            </td>
+                            <td className="p-3.5 font-semibold text-slate-850 dark:text-slate-200">
+                              {res.subjectName}
+                            </td>
+                            <td className="p-3.5">
+                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${res.isMock ? "bg-rose-50 text-rose-650 dark:bg-rose-955/20 dark:text-rose-450" : "bg-blue-50 text-blue-650 dark:bg-blue-955/20 dark:text-blue-450"}`}>
+                                {res.isMock ? "TIMED MOCK" : "PRACTICE"}
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-mono">
+                              <span className="font-bold text-slate-900 dark:text-white">{res.correctAnswers}</span>
+                              <span className="text-slate-400"> / {res.totalQuestions}</span>
+                            </td>
+                            <td className="p-3.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${res.percentage >= 70 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400" : res.percentage >= 50 ? "bg-yellow-50 text-yellow-650 dark:bg-yellow-950/40 dark:text-yellow-405" : "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400"}`}>
+                                  {res.percentage}% ({res.grade})
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3.5 font-mono text-[10px] text-slate-400">
+                              {new Date(res.date).toLocaleDateString()} {new Date(res.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td className="p-3.5">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => setSelectedResultDetail(res)}
+                                  className="px-2.5 py-1.5 bg-indigo-600/10 hover:bg-slate-800/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors hover:scale-103 cursor-pointer"
+                                  title="View complete answer responses corrections"
+                                >
+                                  <LucideIcon name="Eye" size={11} /> Review
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteResult(res.id)}
+                                  className="px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                                  title="Permanently remove result slip"
+                                >
+                                  <LucideIcon name="Trash2" size={11} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* MODAL VIEW FOR ADMINISTRATOR TO COGNITIVELY BROWSE CANDIDATE'S GRADED SHEET CORRECTIONS */}
+                {selectedResultDetail && (
+                  <div className="fixed inset-0 bg-black/60 dark:bg-black/80 flex items-center justify-center z-50 p-4 no-print overflow-y-auto">
+                    <div className={`p-6 sm:p-8 rounded-3xl ${darkMode ? "bg-slate-900 border-2 border-slate-800" : "bg-white"} max-w-3xl w-full max-h-[92vh] overflow-y-auto space-y-6 relative animate-zoom-in`}>
+                      <button
+                        onClick={() => setSelectedResultDetail(null)}
+                        className="absolute right-6 top-6 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-850 cursor-pointer"
+                      >
+                        <LucideIcon name="X" size={18} />
+                      </button>
+
+                      {/* Slip header details */}
+                      <div className="border-b-2 pb-4 border-slate-100 dark:border-slate-800/80 flex items-center gap-3">
+                        <img src={schoolLogo} className="w-12 h-12 object-contain rounded-full border" alt="Faith Foundation Logo" />
+                        <div>
+                          <h4 className="text-base font-black text-indigo-900 dark:text-white uppercase">CBT Candidate Report Card</h4>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">FAITH FOUNDATION SCHOOLS - CORRECTIONS ENGINE</p>
+                        </div>
+                      </div>
+
+                      {/* Candidate details panel */}
+                      <div className="grid sm:grid-cols-2 gap-4 bg-slate-100/50 dark:bg-slate-950/20 p-4 rounded-2xl text-xs border-l-4 border-indigo-650">
+                        <div className="space-y-1">
+                          <div className="text-slate-400 uppercase font-black tracking-widest text-[8px]">Candidate Name</div>
+                          <div className="text-sm font-black uppercase text-indigo-950 dark:text-indigo-400">{selectedResultDetail.studentName}</div>
+                          <div className="font-mono text-[10px] text-slate-400">REG: {selectedResultDetail.studentRegId}</div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-slate-400 uppercase font-black tracking-widest text-[8px]">Exam Subject</div>
+                          <div className="text-sm font-black text-slate-800 dark:text-white">{selectedResultDetail.subjectName}</div>
+                          <div className="font-mono text-[10px] text-slate-400">MODE: {selectedResultDetail.isMock ? "TIMED MOCK" : "UNTIMED PRACTICE"}</div>
+                        </div>
+                      </div>
+
+                      {/* Performance Indicators */}
+                      <div className="grid grid-cols-4 gap-3 text-center">
+                        <div className="p-3 bg-indigo-50/20 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <div className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400">{selectedResultDetail.grade}</div>
+                          <div className="text-[9px] uppercase font-bold text-slate-400 mt-0.5">Grade</div>
+                        </div>
+                        <div className="p-3 bg-indigo-50/20 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <div className="text-xl font-mono font-extrabold text-slate-800 dark:text-white">{selectedResultDetail.percentage}%</div>
+                          <div className="text-[9px] uppercase font-bold text-slate-400 mt-0.5">Score</div>
+                        </div>
+                        <div className="p-3 bg-indigo-50/20 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <div className="text-xl font-mono font-extrabold text-emerald-600">{selectedResultDetail.correctAnswers} / {selectedResultDetail.totalQuestions}</div>
+                          <div className="text-[9px] uppercase font-bold text-slate-400 mt-0.5">Correct</div>
+                        </div>
+                        <div className="p-3 bg-indigo-50/20 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <div className="text-sm font-mono font-extrabold text-slate-600 dark:text-slate-300 mt-1">{formatDuration(selectedResultDetail.timeUsed)}</div>
+                          <div className="text-[9px] uppercase font-bold text-slate-400 mt-1">Duration</div>
+                        </div>
+                      </div>
+
+                      {/* Question by question walkthrough list */}
+                      <div className="space-y-4">
+                        <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800/80">
+                          <LucideIcon name="CheckSquare" className="text-indigo-600" /> Responses walk-through
+                        </h5>
+
+                        <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                          {selectedResultDetail.corrections && selectedResultDetail.corrections.length > 0 ? (
+                            selectedResultDetail.corrections.map((corr: any, idx: number) => (
+                              <div key={idx} className={`p-4 rounded-xl border-2 text-xs space-y-3 ${corr.isCorrect ? "border-emerald-500/10 bg-emerald-500/5" : "border-rose-500/10 bg-rose-500/5"}`}>
+                                <div className="flex justify-between items-center">
+                                  <span className="font-bold text-[10px] text-slate-400 font-mono uppercase">QUESTION {idx + 1} ({corr.topic || "General"})</span>
+                                  <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider ${corr.isCorrect ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                                    {corr.isCorrect ? "CORRECT" : "WRONG"}
+                                  </span>
+                                </div>
+                                <p className="font-bold text-slate-900 dark:text-blue-105 leading-relaxed">{corr.questionText}</p>
+                                
+                                <div className="grid sm:grid-cols-2 gap-2 text-[11px] font-medium leading-normal">
+                                  <div className="p-2.5 rounded bg-amber-500/5 text-slate-700 dark:text-slate-350 flex items-center gap-2">
+                                    <span className="font-bold text-amber-500 text-[10px]">SELECTED:</span>
+                                    <span>{corr.studentAnswer || "No answer selected"}</span>
+                                  </div>
+                                  <div className="p-2.5 rounded bg-emerald-500/5 text-slate-700 dark:text-emerald-350 flex items-center gap-2">
+                                    <span className="font-bold text-emerald-500 text-[10px]">CORRECT:</span>
+                                    <span>{corr.correctAnswer}</span>
+                                  </div>
+                                </div>
+
+                                {corr.explanation && (
+                                  <div className="p-3 bg-slate-150/45 dark:bg-slate-950/40 rounded border-l-2 border-indigo-650 text-[10px] leading-relaxed font-semibold italic text-slate-500 dark:text-slate-400">
+                                    <strong className="text-indigo-600 block uppercase tracking-wider text-[8px] mb-1">CBT CENTER FEEDBACK:</strong>
+                                    {corr.explanation}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-6 text-center text-slate-402">Responses bank was omitted during submission.</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Modal footer download report slip copy option */}
+                      <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 flex justify-end gap-3 text-xs font-bold uppercase tracking-wider">
+                        <button
+                          onClick={() => {
+                            // Easily download this specific result as an elegant text file directly from detail view!
+                            const result = selectedResultDetail;
+                            let textRep = `FAITH FOUNDATION SCHOOLS\n`;
+                            textRep += `--------------------------------------------------\n`;
+                            textRep += `OFFICIAL JSS3 BECE COMPUTER BASED TESTING SLIP\n`;
+                            textRep += `SESSION ID  : ${result.id}\n`;
+                            textRep += `DATE EXECUTED   : ${new Date(result.date).toLocaleString()}\n`;
+                            textRep += `--------------------------------------------------\n`;
+                            textRep += `\nCANDIDATE STUDY PARTICULARS:\n`;
+                            textRep += `Candidate Name  : ${result.studentName.toUpperCase()}\n`;
+                            textRep += `Reg ID Number   : ${result.studentRegId}\n`;
+                            textRep += `Syllabus Subject: ${result.subjectName}\n`;
+                            textRep += `Exam Format Type: ${result.isMock ? "TIMED MOCK PRACTICE" : "UNTIMED PRACTICE LEARNING"}\n`;
+                            textRep += `--------------------------------------------------\n`;
+                            textRep += `\nPERFORMANCE INDEX SUMMARY:\n`;
+                            textRep += `Grade Assigned  : ${result.grade}\n`;
+                            textRep += `Total percentage: ${result.percentage}%\n`;
+                            textRep += `Count Graded    : ${result.correctAnswers} / ${result.totalQuestions} Answered Correctly\n`;
+                            textRep += `Duration Expended: ${Math.floor(result.timeUsed / 60)} minutes ${result.timeUsed % 60} seconds\n`;
+                            textRep += `--------------------------------------------------\n`;
+                            textRep += `\nDETAILED REVIEW CORRECTIONS:\n`;
+                            if (result.corrections) {
+                              result.corrections.forEach((c: any, index: number) => {
+                                textRep += `\n[QUESTION ${index + 1}] Topic: ${c.topic || "General"}\n`;
+                                textRep += `Question: ${c.questionText}\n`;
+                                textRep += `Candidate Response: ${c.studentAnswer}\n`;
+                                textRep += `Correct Response: ${c.correctAnswer}\n`;
+                                textRep += `Indicator: ${c.isCorrect ? "PASSED/CORRECT" : "FAILED/WRONG"}\n`;
+                                textRep += `Correction: ${c.explanation}\n`;
+                              });
+                            }
+                            const blob = new Blob([textRep], { type: "text/plain;charset=utf-8" });
+                            const link = document.createElement("a");
+                            link.href = URL.createObjectURL(blob);
+                            link.download = `FF_BECE_Report_${result.studentName.replace(/\s+/g, "_")}_${result.subjectId}.txt`;
+                            link.click();
+                          }}
+                          className="px-5 py-2.5 bg-slate-900 border border-slate-700/80 hover:bg-slate-800 text-white dark:text-slate-200 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+                        >
+                          🎫 Download Report (.txt)
+                        </button>
+                        <button
+                          onClick={() => setSelectedResultDetail(null)}
+                          className="px-5 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl cursor-pointer"
+                        >
+                          Close Card
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* MONITOR LOGS ACTIVITY */}
           {activeSegment === "logs" && (
