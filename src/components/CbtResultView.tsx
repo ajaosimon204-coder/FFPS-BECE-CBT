@@ -94,7 +94,7 @@ export default function CbtResultView({
                 referrerPolicy="no-referrer"
               />
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-indigo-900 dark:text-white tracking-tight uppercase">FAITH FOUNDATION SCHOOLS</h1>
+                <h1 className="text-lg sm:text-xl font-bold text-indigo-900 dark:text-white tracking-tight uppercase font-serif">FAITH FOUNDATION SCHOOLS</h1>
                 <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">OFFICIAL BECE COMPUTER-BASED REPORT SLIP</p>
               </div>
             </div>

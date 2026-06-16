@@ -464,7 +464,7 @@ export default function AdminDashboard({
               referrerPolicy="no-referrer"
             />
             <div>
-              <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white uppercase leading-none">FAITH FOUNDATION</h1>
+              <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white uppercase leading-none font-serif">FAITH FOUNDATION</h1>
               <p className={`text-[9px] font-mono tracking-wider uppercase mt-0.5 ${darkMode ? "text-slate-400" : "text-indigo-600"}`}>ADMIN CONTROL CENTER</p>
             </div>
           </div>

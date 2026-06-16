@@ -294,9 +294,9 @@ export default function CbtExamView({
             referrerPolicy="no-referrer"
           />
           <div>
-            <h2 className="text-sm font-bold tracking-tight uppercase flex items-center gap-2">
+            <h2 className="text-sm font-bold tracking-tight uppercase flex items-center gap-2 font-serif">
               <span>FAITH FOUNDATION</span>
-              <span className="font-mono text-xs text-indigo-305 dark:text-indigo-400 font-bold tracking-normal italic">CBT PORTAL</span>
+              <span className="font-mono text-xs text-indigo-305 dark:text-indigo-400 font-bold tracking-normal italic font-sans">CBT PORTAL</span>
             </h2>
             <div className={`flex items-center gap-2 text-[10px] font-medium tracking-wide ${darkMode ? "text-slate-400" : "text-indigo-100/90"}`}>
               <span>Candidate: {user.fullName}</span>

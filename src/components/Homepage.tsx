@@ -56,7 +56,7 @@ export default function Homepage({ onNavToAuth, darkMode, setDarkMode }: Homepag
               referrerPolicy="no-referrer"
             />
             <div>
-              <h1 className="text-base font-bold tracking-tight text-indigo-600 dark:text-indigo-400 font-sans leading-none">FAITH FOUNDATION</h1>
+              <h1 className="text-base font-bold tracking-tight text-indigo-600 dark:text-indigo-400 font-serif leading-none">FAITH FOUNDATION</h1>
               <p className="text-[9px] font-medium tracking-widest text-slate-400 uppercase mt-0.5">BECE CBT PORTAL</p>
             </div>
           </div>
@@ -112,8 +112,8 @@ export default function Homepage({ onNavToAuth, darkMode, setDarkMode }: Homepag
                 <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
                 BECE Junior WAEC Exam Practice
               </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-5xl font-bold tracking-tight leading-[1.125] text-slate-900 dark:text-white">
-                Achieve Academic Distinction with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-400">Faith Foundation CBT</span>
+              <h1 className="text-4xl sm:text-5xl lg:text-5xl font-bold tracking-tight leading-[1.125] text-slate-900 dark:text-white font-serif">
+                Achieve Academic Distinction with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-400 font-sans">Faith Foundation CBT</span>
               </h1>
               <p className={`text-base sm:text-lg ${darkMode ? "text-slate-350" : "text-slate-650"} leading-relaxed font-normal`}>
                 A professional, modern Computer-Based Testing platform tailoring JSS3 students with realistic exam simulations. Over 960+ syllabus-aligned questions across 12 core subjects, complete with smart corrections and real-time grading reports.
@@ -215,7 +215,7 @@ export default function Homepage({ onNavToAuth, darkMode, setDarkMode }: Homepag
       {/* ABOUT FAITH FOUNDATION CBT */}
       <section id="about" className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         <div className="text-center max-w-3xl mx-auto space-y-3">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">About Faith Foundation CBT</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white font-serif">About Faith Foundation CBT</h2>
           <div className="h-1 w-12 bg-indigo-600 mx-auto rounded-full" />
           <p className={`text-base leading-relaxed ${darkMode ? "text-slate-300" : "text-slate-650"}`}>
             Our vision is to provide Junior Secondary School (JSS 3) students across West Africa with premier digital tools that simulates the official Basic Education Certificate Exams (BECE). We build academic confidence through systematic test replication, timed speed training, and transparent corrections.
@@ -272,7 +272,7 @@ export default function Homepage({ onNavToAuth, darkMode, setDarkMode }: Homepag
       <section id="subjects" className={`py-16 border-y ${darkMode ? "bg-[#0c111d] border-slate-800/40" : "bg-indigo-50/20 border-slate-200/50"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
-            <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">12 Integrated BECE Subjects</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white font-serif">12 Integrated BECE Subjects</h2>
             <div className="h-1 bg-indigo-600 mx-auto rounded-full w-12" />
             <p className={`text-sm ${darkMode ? "text-slate-350" : "text-slate-600"}`}>
               Carefully curated questions aligned with contemporary West African syllabus modules for each subject.
@@ -313,7 +313,7 @@ export default function Homepage({ onNavToAuth, darkMode, setDarkMode }: Homepag
       {/* WHY EXAM CBT? FEATURES */}
       <section id="why-us" className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         <div className="text-center max-w-2xl mx-auto space-y-3">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Why Use Our CBT Platform</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white font-serif">Why Use Our CBT Platform</h2>
           <div className="h-1 bg-indigo-600 mx-auto rounded-full w-12" />
           <p className={`text-sm ${darkMode ? "text-slate-350" : "text-slate-600"}`}>
             Equipped with state-of-the-art academic software architecture, the Faith Foundation CBT engine represents a school-standard educational benchmark.
