@@ -56,6 +56,55 @@ export default function App() {
     initAndSync();
   }, []);
 
+  // Periodically poll the central server's DB version to instantly sync state changes across gadgets (phone, laptop, tablet, etc.)
+  useEffect(() => {
+    let active = true;
+    let pollTimeout: any = null;
+
+    async function checkVersionAndSync() {
+      if (!active) return;
+      try {
+        const response = await fetch("/api/db/version");
+        if (response.ok) {
+          const { version } = await response.json();
+          const localVerStr = localStorage.getItem("FF_CBT_DB_VERSION");
+          const localVersion = localVerStr ? parseInt(localVerStr, 10) : 0;
+
+          if (version !== undefined && localVersion !== version) {
+            console.log(`[Sync Engine] Central DB modified by another gadget. Syncing from version ${localVersion} to ${version}...`);
+            await syncWithServer();
+          }
+        }
+      } catch (err) {
+        console.warn("[Sync Engine] Background version poll:", err);
+      } finally {
+        if (active) {
+          pollTimeout = setTimeout(checkVersionAndSync, 2000); // Check version every 2 seconds for near real-time updates!
+        }
+      }
+    }
+
+    if (!isSyncing) {
+      checkVersionAndSync();
+    }
+
+    return () => {
+      active = false;
+      if (pollTimeout) clearTimeout(pollTimeout);
+    };
+  }, [isSyncing]);
+
+  // Sync state if another gadget modifies user profiles, login details, or sessions.
+  useEffect(() => {
+    const handleSync = () => {
+      setCurrentUser(getCurrentUser());
+    };
+    window.addEventListener("cbt-db-synced", handleSync);
+    return () => {
+      window.removeEventListener("cbt-db-synced", handleSync);
+    };
+  }, []);
+
   // Sync Dark/Light theme class with document root
   useEffect(() => {
     localStorage.setItem("FF_CBT_DARK_MODE", String(darkMode));

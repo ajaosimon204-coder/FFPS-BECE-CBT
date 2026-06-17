@@ -12,6 +12,11 @@ export async function syncWithServer(): Promise<boolean> {
     const serverDb = await response.json();
 
     if (serverDb && serverDb.initialized) {
+      // Save central version to prevent redundant polling downloads
+      if (serverDb.version !== undefined) {
+        localStorage.setItem("FF_CBT_DB_VERSION", String(serverDb.version));
+      }
+
       // 1. Server database is already populated. Hydrate browser localStorage!
       if (serverDb.questions) {
         localStorage.setItem("FF_CBT_QUESTIONS", JSON.stringify(serverDb.questions));
@@ -33,6 +38,9 @@ export async function syncWithServer(): Promise<boolean> {
       if (serverDb.logs) {
         localStorage.setItem("FF_CBT_ACTIVITY_LOGS", JSON.stringify(serverDb.logs));
       }
+
+      // Notify any active React states to update themselves from storage
+      window.dispatchEvent(new Event("cbt-db-synced"));
       console.log("=== Successfully hydrated localStorage with Central Server State ===");
       return true;
     } else {
@@ -62,6 +70,13 @@ export async function syncWithServer(): Promise<boolean> {
       if (!initResponse.ok) {
         throw new Error("Failed to initialize server database with defaults");
       }
+
+      const initResult = await initResponse.json();
+      if (initResult && initResult.version !== undefined) {
+        localStorage.setItem("FF_CBT_DB_VERSION", String(initResult.version));
+      }
+      
+      window.dispatchEvent(new Event("cbt-db-synced"));
       console.log("=== Successfully initialized Central Server with seed content ===");
       return true;
     }
@@ -83,6 +98,11 @@ export async function pushCollectionToServer(key: string, data: any): Promise<bo
       throw new Error(`Sync error while saving collection "${key}"`);
     }
     const result = await response.json();
+    if (result.success && result.version !== undefined) {
+      localStorage.setItem("FF_CBT_DB_VERSION", String(result.version));
+    }
+    // Fire event to notify local state components that data has updated
+    window.dispatchEvent(new Event("cbt-db-synced"));
     return result.success;
   } catch (e) {
     console.warn("Retrying collection push in background later. Offline state preserved.", e);

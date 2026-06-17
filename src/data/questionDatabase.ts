@@ -872,9 +872,9 @@ export function getQuestionsFromDB(): Question[] {
   }
 }
 
-export function saveQuestionsToDB(questions: Question[]) {
+export function saveQuestionsToDB(questions: Question[]): Promise<boolean> {
   localStorage.setItem("FF_CBT_QUESTIONS", JSON.stringify(questions));
-  pushCollectionToServer("questions", questions);
+  return pushCollectionToServer("questions", questions);
 }
 
 export function addQuestionToDB(q: Omit<Question, "id">): Question {

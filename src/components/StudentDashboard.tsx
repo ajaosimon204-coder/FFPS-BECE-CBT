@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import DatabaseHealthCheck from "./DatabaseHealthCheck";
 import { User, Subject, ExamConfig, Result } from "../types";
 import { SUBJECTS } from "../data/subjectData";
 import { getResultsFromDB, getLeaderboard, getBookmarkedQuestions, toggleBookmarkInDB, getPerformanceInsights } from "../lib/results";
@@ -32,7 +33,7 @@ export default function StudentDashboard({
   onStartExam,
   onViewResultCorrections
 }: StudentDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"exams" | "history" | "analytics" | "leaderboard" | "bookmarks">("exams");
+  const [activeTab, setActiveTab] = useState<"exams" | "history" | "analytics" | "leaderboard" | "bookmarks" | "diagnostics">("exams");
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [questionCount, setQuestionCount] = useState<number>(30);
   const [examMode, setExamMode] = useState<"Practice" | "Mock">("Mock");
@@ -41,6 +42,24 @@ export default function StudentDashboard({
   const [recoverySubmitted, setRecoverySubmitted] = useState(false);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
+
+  const [questionsVersion, setQuestionsVersion] = useState(0);
+
+  useEffect(() => {
+    function handleSync() {
+      console.log("[StudentDashboard] Centralized update notification received. Invoking reactive re-render.");
+      setQuestionsVersion((v) => v + 1);
+    }
+
+    // React instantly when App syncs central server changes or local write completes
+    window.addEventListener("cbt-db-synced", handleSync);
+    window.addEventListener("focus", handleSync);
+
+    return () => {
+      window.removeEventListener("cbt-db-synced", handleSync);
+      window.removeEventListener("focus", handleSync);
+    };
+  }, []);
 
   const results = getResultsFromDB().filter((r) => r.studentId === user.id);
   const leaderboard = getLeaderboard();
@@ -260,6 +279,13 @@ export default function StudentDashboard({
             className={`pb-3 px-1.5 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeTab === "bookmarks" ? "border-indigo-600 text-indigo-650 dark:text-indigo-400 font-bold" : "border-transparent text-slate-400 hover:text-slate-600"}`}
           >
             <LucideIcon name="Bookmark" size={14} /> Bookmarks ({bookmarks.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("diagnostics")}
+            className={`pb-3 px-1.5 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeTab === "diagnostics" ? "border-emerald-600 text-emerald-650 dark:text-emerald-400 font-bold" : "border-transparent text-slate-400 hover:text-slate-600"}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Database Health Check
           </button>
         </div>
 
@@ -643,6 +669,10 @@ export default function StudentDashboard({
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === "diagnostics" && (
+            <DatabaseHealthCheck user={user} />
           )}
         </div>
       </main>

@@ -12,6 +12,7 @@ import {
   logActivity
 } from "../data/questionDatabase";
 import { getResultsFromDB, saveResultsToDB } from "../lib/results";
+import DatabaseHealthCheck from "./DatabaseHealthCheck";
 import LucideIcon from "./LucideIcon";
 import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 import {
@@ -38,7 +39,7 @@ export default function AdminDashboard({
   darkMode,
   setDarkMode
 }: AdminDashboardProps) {
-  const [activeSegment, setActiveSegment] = useState<"stats" | "bank" | "results" | "logs">("stats");
+  const [activeSegment, setActiveSegment] = useState<"stats" | "bank" | "results" | "logs" | "diagnostics">("stats");
   const [questions, setQuestions] = useState<Question[]>(getQuestionsFromDB());
   const [results, setResults] = useState<any[]>(getResultsFromDB());
   const [searchQuery, setSearchQuery] = useState("");
@@ -90,6 +91,8 @@ export default function AdminDashboard({
   } | null>(null);
   const [sqlCopied, setSqlCopied] = useState(false);
   const [showSqlGuide, setShowSqlGuide] = useState(false);
+  const [isCloudSaving, setIsCloudSaving] = useState(false);
+  const [cloudSaveMessage, setCloudSaveMessage] = useState("");
 
   useEffect(() => {
     async function checkSupabase() {
@@ -105,6 +108,30 @@ export default function AdminDashboard({
     }
     checkSupabase();
   }, [questions, results]);
+
+  // Periodic background check to download database updates from Supabase Cloud if changed by other devices
+  useEffect(() => {
+    function handleCbtDbSynced() {
+      console.log("[AdminDashboard] Centralized update notification received. Refreshing admin states.");
+      setQuestions(getQuestionsFromDB());
+      setResults(getResultsFromDB());
+      try {
+        const updatedLogsStr = localStorage.getItem("FF_CBT_ACTIVITY_LOGS") || "[]";
+        setActivityLogs(JSON.parse(updatedLogsStr));
+      } catch (e) {
+        console.error("Failed to parse activity logs on sync:", e);
+      }
+    }
+
+    // Subscribe to immediate real-time event notifications or focus shifts
+    window.addEventListener("cbt-db-synced", handleCbtDbSynced);
+    window.addEventListener("focus", handleCbtDbSynced);
+
+    return () => {
+      window.removeEventListener("cbt-db-synced", handleCbtDbSynced);
+      window.removeEventListener("focus", handleCbtDbSynced);
+    };
+  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -242,39 +269,57 @@ export default function AdminDashboard({
     reader.readAsBinaryString(file);
   };
 
-  const handleImportSelectedQuestions = () => {
+  const handleImportSelectedQuestions = async () => {
     const selectedList = uploadedQuestions.filter((q) => selectedUploadIds[q.id]);
     if (selectedList.length === 0) {
       alert("No questions selected. Please tick the questions you want to add.");
       return;
     }
 
-    const currentDB = getQuestionsFromDB();
-    const formattedSelected = selectedList.map((q, idx) => {
-      const dbId = `${q.subjectId}_imported_${Date.now()}_${idx}`;
-      return {
-        ...q,
-        id: dbId,
-        isUploaded: true, // Prioritize this custom Excel upload!
-        originalOptions: [...q.options]
-      };
-    });
+    setIsCloudSaving(true);
+    setCloudSaveMessage("Merging, compiling and uploading picked questions to database...");
 
-    const newMergedDB = [...formattedSelected, ...currentDB];
-    saveQuestionsToDB(newMergedDB);
-    logActivity(
-      user.id,
-      user.fullName,
-      UserRole.ADMIN,
-      "Upload sheet questions",
-      `Uploaded and picked ${formattedSelected.length} questions from Excel/CSV file.`
-    );
+    try {
+      const currentDB = getQuestionsFromDB();
+      const formattedSelected = selectedList.map((q, idx) => {
+        const dbId = `${q.subjectId}_imported_${Date.now()}_${idx}`;
+        return {
+          ...q,
+          id: dbId,
+          isUploaded: true, // Prioritize this custom Excel upload!
+          originalOptions: [...q.options]
+        };
+      });
 
-    setUploadedQuestions([]);
-    setSelectedUploadIds({});
-    setQuestions(newMergedDB);
-    setFileImportSuccess(`Successfully added ${formattedSelected.length} picked questions to the main curriculum question bank!`);
-    setTimeout(() => setFileImportSuccess(""), 5000);
+      const newMergedDB = [...formattedSelected, ...currentDB];
+      
+      setCloudSaveMessage("Syncing complete question bank with Supabase Cloud...");
+      const syncOk = await saveQuestionsToDB(newMergedDB);
+
+      logActivity(
+        user.id,
+        user.fullName,
+        UserRole.ADMIN,
+        "Upload sheet questions",
+        `Uploaded and picked ${formattedSelected.length} questions from Excel/CSV file.`
+      );
+
+      setUploadedQuestions([]);
+      setSelectedUploadIds({});
+      setQuestions(newMergedDB);
+      
+      if (syncOk) {
+        setFileImportSuccess(`Successfully added and cloud-synchronized ${formattedSelected.length} picked questions with Supabase!`);
+      } else {
+        setFileImportSuccess(`Successfully added ${formattedSelected.length} questions locally. Note: Cloud synchronization failed. Setup SQL table if needed.`);
+      }
+      setTimeout(() => setFileImportSuccess(""), 6000);
+    } catch (err: any) {
+      alert(`Failed to save: ${err.message || err}`);
+    } finally {
+      setIsCloudSaving(false);
+      setCloudSaveMessage("");
+    }
   };
 
   const resultsList = results;
@@ -304,63 +349,129 @@ export default function AdminDashboard({
     setIsAddOpen(true);
   };
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQForm.questionText || !newQForm.optA || !newQForm.optB) {
       alert("Please complete the Question field and Option keys!");
       return;
     }
 
-    const created = addQuestionToDB({
-      subjectId: newQForm.subjectId,
-      questionText: newQForm.questionText,
-      options: [newQForm.optA, newQForm.optB, newQForm.optC, newQForm.optD].filter(Boolean),
-      originalOptions: [newQForm.optA, newQForm.optB, newQForm.optC, newQForm.optD].filter(Boolean),
-      correctAnswer: newQForm.correctAnswer || newQForm.optA,
-      explanation: newQForm.explanation || "No explanation provided.",
-      difficulty: newQForm.difficulty,
-      topic: newQForm.topic || "General Study"
-    });
+    setIsCloudSaving(true);
+    setCloudSaveMessage("Adding and synchronizing new question with Supabase Cloud...");
 
-    setIsAddOpen(false);
-    handleRefreshDB();
-    alert("New BECE CBT Question created successfully!");
-  };
+    try {
+      const list = getQuestionsFromDB();
+      const newId = `manual_add_${Date.now()}`;
+      const opts = [newQForm.optA, newQForm.optB, newQForm.optC, newQForm.optD].filter(Boolean);
+      const fullQ: Question = {
+        id: newId,
+        subjectId: newQForm.subjectId,
+        questionText: newQForm.questionText,
+        options: opts,
+        originalOptions: [...opts],
+        correctAnswer: newQForm.correctAnswer || newQForm.optA,
+        explanation: newQForm.explanation || "No explanation provided.",
+        difficulty: newQForm.difficulty,
+        topic: newQForm.topic || "General Study",
+        isUploaded: true
+      };
+      
+      list.unshift(fullQ);
+      const syncOk = await saveQuestionsToDB(list);
 
-  const handleUpdateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingQuestion) return;
-
-    const list = getQuestionsFromDB();
-    const idx = list.findIndex((q) => q.id === editingQuestion.id);
-    if (idx !== -1) {
-      list[idx] = { ...editingQuestion, originalOptions: [...editingQuestion.options] };
-      saveQuestionsToDB(list);
-      logActivity(user.id, user.fullName, UserRole.ADMIN, "Edit Question", `Admin edited question: "${editingQuestion.questionText.slice(0, 40)}..."`);
-      setEditingQuestion(null);
+      logActivity(user.id, user.fullName, UserRole.ADMIN, "Add Question", `Added a new manual JSS3 question: "${newQForm.questionText.slice(0, 40)}..."`);
+      
+      setIsAddOpen(false);
       handleRefreshDB();
-      alert("Question updated successfully!");
+      
+      if (syncOk) {
+        alert("New BECE CBT Question created and cloud-synchronized successfully!");
+      } else {
+        alert("New Question created locally. Note: Cloud synchronization failed. Please check Supabase table status.");
+      }
+    } catch (err: any) {
+      alert(`Failed to add: ${err.message || err}`);
+    } finally {
+      setIsCloudSaving(false);
+      setCloudSaveMessage("");
     }
   };
 
-  const handleDeleteQ = (id: string) => {
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingQuestion) return;
+
+    setIsCloudSaving(true);
+    setCloudSaveMessage("Synchronizing updated question with Supabase Cloud...");
+
+    try {
+      const list = getQuestionsFromDB();
+      const idx = list.findIndex((q) => q.id === editingQuestion.id);
+      if (idx !== -1) {
+        list[idx] = { ...editingQuestion, originalOptions: [...editingQuestion.options] };
+        const syncOk = await saveQuestionsToDB(list);
+        
+        logActivity(user.id, user.fullName, UserRole.ADMIN, "Edit Question", `Admin edited question: "${editingQuestion.questionText.slice(0, 40)}..."`);
+        setEditingQuestion(null);
+        handleRefreshDB();
+        
+        if (syncOk) {
+          alert("Question updated and synchronized to Cloud successfully!");
+        } else {
+          alert("Question updated locally. Note: Cloud sync failed.");
+        }
+      }
+    } catch (err: any) {
+      alert(`Failed to save question update: ${err.message || err}`);
+    } finally {
+      setIsCloudSaving(false);
+      setCloudSaveMessage("");
+    }
+  };
+
+  const handleDeleteQ = async (id: string) => {
     if (confirm("Are you sure you want to permanently delete this question from the CBT database?")) {
-      deleteQuestionFromDB(id);
-      handleRefreshDB();
+      setIsCloudSaving(true);
+      setCloudSaveMessage("Removing question and syncing database state...");
+      
+      try {
+        const list = getQuestionsFromDB();
+        const filtered = list.filter((q) => q.id !== id);
+        const syncOk = await saveQuestionsToDB(filtered);
+        
+        logActivity(user.id, user.fullName, UserRole.ADMIN, "Delete Question", `Deleted question with ID: ${id}`);
+        handleRefreshDB();
+        
+        if (syncOk) {
+          alert("Question deleted and synchronized successfully!");
+        } else {
+          alert("Question deleted locally. Note: Cloud sync failed.");
+        }
+      } catch (err: any) {
+        alert(`Failed to delete question: ${err.message || err}`);
+      } finally {
+        setIsCloudSaving(false);
+        setCloudSaveMessage("");
+      }
     }
   };
 
   // CSV Bulk Importer Logic
-  const handleCsvImport = () => {
+  const handleCsvImport = async () => {
     if (!csvText.trim()) {
       setBulkError("CSV input area is empty. Please paste valid CSV lines.");
       return;
     }
 
+    setIsCloudSaving(true);
+    setCloudSaveMessage("Importing and synchronizing CSV questions with Supabase Cloud...");
+
     try {
       const rows = csvText.split("\n");
       if (rows.length < 2) {
         setBulkError("Insufficient rows. First row must serve as matching Column headers.");
+        setIsCloudSaving(false);
+        setCloudSaveMessage("");
         return;
       }
 
@@ -456,16 +567,23 @@ export default function AdminDashboard({
         addedCount++;
       }
 
-      saveQuestionsToDB(list);
+      const syncOk = await saveQuestionsToDB(list);
       logActivity(user.id, user.fullName, UserRole.ADMIN, "Import Questions", `Bulk-imported ${addedCount} questions via pasted CSV data.`);
 
       setQuestions(list);
-      setBulkSuccess(`Success! Completed bulk uploading of ${addedCount} questions right into the CBT database.`);
+      if (syncOk) {
+        setBulkSuccess(`Success! Completed bulk uploading & cloud-synchronizing of ${addedCount} questions right into Supabase!`);
+      } else {
+        setBulkSuccess(`Success! Bulk uploaded ${addedCount} questions locally (Note: Cloud connection not active).`);
+      }
       setBulkError("");
       setCsvText("");
       setTimeout(() => setBulkSuccess(""), 4000);
     } catch (e: any) {
       setBulkError(`Upload failed: ${e.message}`);
+    } finally {
+      setIsCloudSaving(false);
+      setCloudSaveMessage("");
     }
   };
 
@@ -527,6 +645,43 @@ export default function AdminDashboard({
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Real-time Supabase Cloud Integration Status */}
+            {supabaseStatus && (
+              <button
+                onClick={() => {
+                  if (!supabaseStatus.supabaseConfigured || !supabaseStatus.supabaseConnected || !supabaseStatus.tableExists) {
+                    setActiveSegment("stats");
+                    setShowSqlGuide(true);
+                    setTimeout(() => {
+                      const el = document.getElementById("supabase-panel");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
+                  }
+                }}
+                className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] uppercase font-bold tracking-wider transition-all cursor-pointer ${
+                  supabaseStatus.supabaseConfigured && supabaseStatus.supabaseConnected && supabaseStatus.tableExists
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-sans"
+                    : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-450 hover:border-amber-500 animation-pulse font-sans"
+                }`}
+                title={
+                  supabaseStatus.supabaseConfigured && supabaseStatus.supabaseConnected && supabaseStatus.tableExists
+                    ? "Supabase synchronized connection active! Live sharing is fully enabled."
+                    : "Caution: Using local storage backup. Click here to configure secure central cloud sharing."
+                }
+              >
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  supabaseStatus.supabaseConfigured && supabaseStatus.supabaseConnected && supabaseStatus.tableExists
+                    ? "bg-emerald-500 animate-pulse"
+                    : "bg-amber-500"
+                }`} />
+                <span>
+                  {supabaseStatus.supabaseConfigured && supabaseStatus.supabaseConnected && supabaseStatus.tableExists
+                    ? "Supabase Integrated"
+                    : "Local-Only Backup (Cloud Disconnected)"}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={() => setDarkMode(!darkMode)}
               className={`p-2 rounded-xl border transition-colors cursor-pointer ${darkMode ? "border-slate-800 text-amber-405 hover:bg-slate-805" : "border-slate-200 text-slate-600 hover:bg-slate-100 bg-white shadow-xs"}`}
@@ -626,6 +781,13 @@ export default function AdminDashboard({
             className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "logs" ? "border-indigo-600 text-indigo-650 dark:text-indigo-455" : "border-transparent text-slate-405 hover:text-slate-600"}`}
           >
             <LucideIcon name="Activity" size={13} /> Student Activity Logs ({activityLogs.length})
+          </button>
+          <button
+            onClick={() => setActiveSegment("diagnostics")}
+            className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "diagnostics" ? "border-emerald-650 text-emerald-650 dark:text-emerald-400 font-bold" : "border-transparent text-slate-405 hover:text-slate-600"}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            Database Health Check
           </button>
         </div>
 
@@ -1633,6 +1795,10 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
               </div>
             </div>
           )}
+
+          {activeSegment === "diagnostics" && (
+            <DatabaseHealthCheck user={user} />
+          )}
         </div>
       </main>
 
@@ -1902,6 +2068,23 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
                 </button>
               </form>
             </motion.div>
+          </div>
+        )}
+        {/* CLOUD SAVING MODAL OVERLAY */}
+        {isCloudSaving && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 text-center flex flex-col items-center max-w-xs space-y-4 animate-duration-150">
+              <div className="relative">
+                <div className="w-10 h-10 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="w-2 h-2 bg-indigo-600 rounded-full animate-ping"></span>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-950 dark:text-white">Central Sync Active</h4>
+                <p className="text-[11px] text-slate-400 dark:text-slate-400 mt-1 leading-relaxed leading-normal">{cloudSaveMessage || "Updating central CBT cloud store..."}</p>
+              </div>
+            </div>
           </div>
         )}
       </AnimatePresence>

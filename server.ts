@@ -8,8 +8,34 @@ const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), "cbt_server_db.json");
 
 // Connect to external Supabase if keys exist in environment
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+let supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+if (supabaseUrl.startsWith('"') && supabaseUrl.endsWith('"')) {
+  supabaseUrl = supabaseUrl.slice(1, -1).trim();
+} else if (supabaseUrl.startsWith("'") && supabaseUrl.endsWith("'")) {
+  supabaseUrl = supabaseUrl.slice(1, -1).trim();
+}
+
+// Clean up trailing slashes
+while (supabaseUrl.endsWith("/")) {
+  supabaseUrl = supabaseUrl.slice(0, -1).trim();
+}
+
+// Automatically detect and strip "/rest/v1" suffix commonly pasted by users from API documentation
+if (supabaseUrl.endsWith("/rest/v1")) {
+  supabaseUrl = supabaseUrl.substring(0, supabaseUrl.length - 8).trim();
+}
+
+// Strip any newly exposed trailing slashes
+while (supabaseUrl.endsWith("/")) {
+  supabaseUrl = supabaseUrl.slice(0, -1).trim();
+}
+
+let supabaseKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "").trim();
+if (supabaseKey.startsWith('"') && supabaseKey.endsWith('"')) {
+  supabaseKey = supabaseKey.slice(1, -1).trim();
+} else if (supabaseKey.startsWith("'") && supabaseKey.endsWith("'")) {
+  supabaseKey = supabaseKey.slice(1, -1).trim();
+}
 
 let supabase: any = null;
 if (supabaseUrl && supabaseKey) {
@@ -20,6 +46,9 @@ if (supabaseUrl && supabaseKey) {
     console.error("Failed to initialize Supabase client:", err);
   }
 }
+
+// Global state counter to notify devices/gadgets about state modifications instantly in real-time
+let dbChangeCounter = Date.now();
 
 // Helper to load current local fallback database state safely
 function loadServerDb() {
@@ -76,25 +105,31 @@ async function startServer() {
         supabaseConfigured: false,
         supabaseConnected: false,
         tableExists: false,
+        url: "Not set in server environment",
         error: "Supabase keys (SUPABASE_URL, SUPABASE_ANON_KEY) are not set in the environment yet."
       });
     }
 
     try {
-      const { error } = await supabase.from("cbt_sync_store").select("key").limit(1);
+      const startTime = Date.now();
+      const { data, error } = await supabase.from("cbt_sync_store").select("key").limit(1);
+      const readLatency = Date.now() - startTime;
+
       if (error) {
-        if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        if (error.code === "42P01" || error.code === "PGRST125" || error.message?.includes("does not exist") || error.message?.includes("PGRST125")) {
           return res.json({
             supabaseConfigured: true,
             supabaseConnected: true,
             tableExists: false,
-            error: "The custom table 'cbt_sync_store' does not exist in your Supabase database yet."
+            url: supabaseUrl,
+            error: "The custom table 'cbt_sync_store' does not exist in your Supabase database yet (or the database schema is empty)."
           });
         }
         return res.json({
           supabaseConfigured: true,
           supabaseConnected: false,
           tableExists: false,
+          url: supabaseUrl,
           error: error.message
         });
       }
@@ -102,6 +137,8 @@ async function startServer() {
         supabaseConfigured: true,
         supabaseConnected: true,
         tableExists: true,
+        url: supabaseUrl,
+        readLatencyMs: readLatency,
         error: null
       });
     } catch (e: any) {
@@ -109,9 +146,15 @@ async function startServer() {
         supabaseConfigured: true,
         supabaseConnected: false,
         tableExists: false,
+        url: supabaseUrl,
         error: e.message
       });
     }
+  });
+
+  // Fetch the current central database schema change/mutation version
+  app.get("/api/db/version", (req, res) => {
+    res.json({ version: dbChangeCounter });
   });
 
   // API Endpoints for Central Multi-Device Synchronization
@@ -120,14 +163,19 @@ async function startServer() {
     
     if (!supabase) {
       // Return server-local DB state if Supabase is unconfigured
-      return res.json({ ...localDb, usingSupabaseFallback: false });
+      return res.json({ ...localDb, usingSupabaseFallback: false, version: dbChangeCounter });
     }
 
     try {
       const { data, error } = await supabase.from("cbt_sync_store").select("*");
       if (error) {
-        console.warn("Supabase fetch failed, falling back to local Server DB. Error Code:", error.code);
-        return res.json({ ...localDb, usingSupabaseFallback: true, syncError: error.message });
+        if (error.code === "PGRST125") {
+          console.log("[Supabase Sync] Remote project has an uninitialized schema (Code 125). Serving local JSON DB backup store.");
+          console.log("[Supabase Setup] Please use the SQL script under the Admin Dashboard tab to create the cbt_sync_store table when ready.");
+        } else {
+          console.log("[Supabase Sync] Remote request returned status code:", error.code, "-", error.message);
+        }
+        return res.json({ ...localDb, usingSupabaseFallback: true, syncError: error.message, version: dbChangeCounter });
       }
 
       const db: any = { initialized: true, usingSupabaseFallback: false };
@@ -138,10 +186,10 @@ async function startServer() {
       // Maintain server-local DB mirrored state in file as secondary backup
       saveServerDb({ ...localDb, ...db });
       
-      res.json(db);
+      res.json({ ...db, version: dbChangeCounter });
     } catch (e: any) {
       console.error("Exception fetching from Supabase:", e);
-      res.json({ ...localDb, usingSupabaseFallback: true, syncError: e.message });
+      res.json({ ...localDb, usingSupabaseFallback: true, syncError: e.message, version: dbChangeCounter });
     }
   });
 
@@ -177,7 +225,8 @@ async function startServer() {
       }
 
       console.log("Central server database successfully initialized from local configuration!");
-      res.json({ success: true, db: localDb });
+      dbChangeCounter++;
+      res.json({ success: true, db: localDb, version: dbChangeCounter });
     } catch (e: any) {
       console.error("Fail initialize API handler:", e);
       res.status(500).json({ error: e.message });
@@ -205,13 +254,15 @@ async function startServer() {
           updated_at: new Date().toISOString()
         });
         if (error) {
+          dbChangeCounter++;
           console.warn(`Supabase upsert failed for key '${key}', saved to server fallback JSON instead:`, error.message);
-          return res.json({ success: true, savedToLocalOnly: true, error: error.message });
+          return res.json({ success: true, savedToLocalOnly: true, error: error.message, version: dbChangeCounter });
         }
       }
 
+      dbChangeCounter++;
       console.log(`Updated central collection: "${key}" with state size ${Array.isArray(data) ? data.length : "object"}`);
-      res.json({ success: true, savedToLocalOnly: !supabase });
+      res.json({ success: true, savedToLocalOnly: !supabase, version: dbChangeCounter });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
