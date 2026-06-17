@@ -234,59 +234,70 @@ export default function CbtExamView({
   const totalTimeSeconds = config.duration * 60;
   const currentSubject = SUBJECTS.find((s) => s.id === config.subjectId);
 
-  // Initialize and select random questions
+  // Initialize, scramble options, and fully randomize subject question sequences uniquely per student
   useEffect(() => {
-    // Filter subject questions
-    const subjectQ = allQuestions.filter((q) => q.subjectId === config.subjectId);
-    
-    // Deduplicate questions by normalized questionText to strictly guarantee no repeated questions can ever be selected
-    const uniqueQMap = new Map<string, Question>();
-    subjectQ.forEach((q) => {
-      const normalized = q.questionText.trim().toLowerCase();
-      if (!uniqueQMap.has(normalized)) {
-        uniqueQMap.set(normalized, q);
-      }
-    });
-    const uniqueSubjectQ = Array.from(uniqueQMap.values());
-    
-    // Prioritize spreadsheet/Excel-uploaded questions ("mostly picked and shown")
-    const uploadedQ = uniqueSubjectQ.filter((q) => q.isUploaded);
-    const regularQ = uniqueSubjectQ.filter((q) => !q.isUploaded);
+    let finalQuestions: Question[] = [];
+    let savedBackup: any = null;
 
-    // Shuffle both subsets independently to keep randomness within types
-    const shuffledUploaded = [...uploadedQ].sort(() => 0.5 - Math.random());
-    const shuffledRegular = [...regularQ].sort(() => 0.5 - Math.random());
-
-    // Merge them: uploaded first, then regular questions backfill
-    const mergedQ = [...shuffledUploaded, ...shuffledRegular];
-    const selected = mergedQ.slice(0, Math.min(config.questionCount, mergedQ.length));
-
-    // Process options shuffling for each question
-    const processed = selected.map((q) => {
-      const opts = [...(q.originalOptions || q.options || [])];
-      // Shuffle options randomly
-      const shuffledOptions = opts.sort(() => 0.5 - Math.random());
-      return {
-        ...q,
-        options: shuffledOptions
-      };
-    });
-
-    setQuestions(processed);
-
-    // Save auto-load backups if page is refreshed
+    // Check if we have an ongoing backup session for this student + subject
     try {
-      const savedBackup = localStorage.getItem(`FF_CBT_BACKUP_${user.id}_${config.subjectId}`);
-      if (savedBackup) {
-        const { backupAnswers, backupIndex, backupTime, backupMarked } = JSON.parse(savedBackup);
-        setAnswers(backupAnswers || {});
-        setCurrentIndex(backupIndex || 0);
-        setTimeLeft(backupTime || config.duration * 60);
-        setMarkedReview(backupMarked || []);
+      const backupStr = localStorage.getItem(`FF_CBT_BACKUP_${user.id}_${config.subjectId}`);
+      if (backupStr) {
+        savedBackup = JSON.parse(backupStr);
       }
     } catch (e) {
-      console.warn("Failed to load local backup", e);
+      console.warn("Failed to parse local backup indices", e);
     }
+
+    // If backup exists and contains the exact question set, restore it to avoid re-scrambling or altering questions on browser refresh!
+    if (savedBackup && savedBackup.backupQuestions && savedBackup.backupQuestions.length > 0) {
+      finalQuestions = savedBackup.backupQuestions;
+      setAnswers(savedBackup.backupAnswers || {});
+      setCurrentIndex(savedBackup.backupIndex || 0);
+      setTimeLeft(savedBackup.backupTime || config.duration * 60);
+      setMarkedReview(savedBackup.backupMarked || []);
+    } else {
+      // Otherwise, construct a custom randomized exam sheet uniquely for this candidate
+      const subjectQ = allQuestions.filter((q) => q.subjectId === config.subjectId);
+      
+      // Deduplicate questions by normalized questionText to strictly guarantee no repeated questions can ever be selected
+      const uniqueQMap = new Map<string, Question>();
+      subjectQ.forEach((q) => {
+        const normalized = q.questionText.trim().toLowerCase();
+        if (!uniqueQMap.has(normalized)) {
+          uniqueQMap.set(normalized, q);
+        }
+      });
+      const uniqueSubjectQ = Array.from(uniqueQMap.values());
+      
+      // Prioritize spreadsheet/Excel-uploaded questions ("mostly picked and shown")
+      const uploadedQ = uniqueSubjectQ.filter((q) => q.isUploaded);
+      const regularQ = uniqueSubjectQ.filter((q) => !q.isUploaded);
+
+      // Shuffle both subsets independently to introduce total candidate-specific randomized pool selection
+      const shuffledUploaded = [...uploadedQ].sort(() => 0.5 - Math.random());
+      const shuffledRegular = [...regularQ].sort(() => 0.5 - Math.random());
+
+      // Merge them: uploaded first, then regular questions backfill
+      const mergedQ = [...shuffledUploaded, ...shuffledRegular];
+      const selected = mergedQ.slice(0, Math.min(config.questionCount, mergedQ.length));
+
+      // 1. Process choice options scrambling randomly for each question to deter direct peeking
+      const processed = selected.map((q) => {
+        const opts = [...(q.originalOptions || q.options || [])];
+        const shuffledOptions = opts.sort(() => 0.5 - Math.random());
+        return {
+          ...q,
+          options: shuffledOptions
+        };
+      });
+
+      // 2. Fully randomize the entire questionnaire sequence for this specific student!
+      // This guarantees that Question #1 of candidate A is Question #12 or #25 of candidate B!
+      finalQuestions = processed.sort(() => 0.5 - Math.random());
+    }
+
+    setQuestions(finalQuestions);
   }, [config, allQuestions, user]);
 
   // Handle countdown timer & auto-saving backups
@@ -307,7 +318,8 @@ export default function CbtExamView({
               backupAnswers: answers,
               backupIndex: currentIndex,
               backupTime: nextTime,
-              backupMarked: markedReview
+              backupMarked: markedReview,
+              backupQuestions: questions
             })
           );
         }
@@ -452,11 +464,15 @@ export default function CbtExamView({
               <span>FAITH FOUNDATION</span>
               <span className="font-mono text-xs text-indigo-305 dark:text-indigo-400 font-bold tracking-normal italic font-sans">CBT PORTAL</span>
             </h2>
-            <div className={`flex items-center gap-2 text-[10px] font-medium tracking-wide ${darkMode ? "text-slate-400" : "text-indigo-100/90"}`}>
+            <div className={`flex flex-wrap items-center gap-2 text-[10px] font-medium tracking-wide ${darkMode ? "text-slate-400" : "text-indigo-100/90"}`}>
               <span>Candidate: {user.fullName}</span>
               <span>•</span>
-              <span className={`px-1.5 py-0.2 rounded font-semibold ${config.mode === "Mock" ? "bg-rose-500/20 text-rose-300" : "bg-violet-500/20 text-violet-300"}`}>
+              <span className={`px-1.5 py-0.2 rounded font-semibold ${config.mode === "Mock" ? "bg-rose-550/25 text-rose-300" : "bg-violet-550/25 text-violet-300"}`}>
                 {config.mode === "Mock" ? "Mock Exam" : "Practice Learning"}
+              </span>
+              <span>•</span>
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md font-bold text-[9px] dark:bg-amber-550/25 dark:text-amber-300 bg-amber-200 text-amber-900 border border-amber-500/10`} title="Anti-cheating dynamic scrambling sequence & options order scrambling is active">
+                <LucideIcon name="Shield" size={10} /> Scrambled Shuffling Active
               </span>
             </div>
           </div>

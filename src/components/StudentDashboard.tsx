@@ -746,6 +746,21 @@ export default function StudentDashboard({
                     <span>120m max</span>
                   </div>
                 </div>
+
+                {/* Anti-Cheating Suite Badge Alert */}
+                <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/15 text-slate-705 dark:text-slate-300 space-y-1.5 leading-relaxed">
+                  <div className="flex items-center gap-1.5 font-bold text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                    <LucideIcon name="ShieldAlert" size={13} /> Active Anti-Collaboration System
+                  </div>
+                  <p className="text-[9px] font-medium leading-normal">
+                    To strictly eliminate side-by-side cheating during simultaneous examinations:
+                  </p>
+                  <ul className="text-[9px] font-semibold list-disc pl-4 space-y-0.5 mt-1 text-slate-500 dark:text-slate-400">
+                    <li><strong>Question Shuffle:</strong> Your question sequence completely differs from neighbor screens.</li>
+                    <li><strong>Choice Scrambling:</strong> A, B, C, D option texts are randomly mixed per candidate.</li>
+                    <li><strong>Independent Reservoirs:</strong> New sessions sample dynamic questions differently!</li>
+                  </ul>
+                </div>
               </div>
 
               {/* Start Trigger */}
