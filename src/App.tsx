@@ -5,6 +5,7 @@ import { getCurrentUser, loginUser, registerStudent, logoutUser, getUsersFromDB 
 import { getQuestionsFromDB } from "./data/questionDatabase";
 import { saveResult, getGrade } from "./lib/results";
 import { SUBJECTS } from "./data/subjectData";
+import { syncWithServer } from "./lib/sync";
 import schoolLogo from "./assets/images/school_logo_1781627574517.jpg";
 
 // Subcomponets
@@ -35,11 +36,24 @@ export default function App() {
   // Exam states
   const [activeExamConfig, setActiveExamConfig] = useState<ExamConfig | null>(null);
   const [activeResult, setActiveResult] = useState<Result | null>(null);
+  const [isSyncing, setIsSyncing] = useState(true);
 
   // Initialize DB on App load
   useEffect(() => {
-    getUsersFromDB(); // Seed core demo database profiles
-    getQuestionsFromDB(); // Seed 960+ questions bank
+    async function initAndSync() {
+      try {
+        await syncWithServer();
+      } catch (e) {
+        console.error("In-memory central server fallback triggered", e);
+      } finally {
+        getUsersFromDB(); // Seed core demo database profiles
+        getQuestionsFromDB(); // Seed 960+ questions bank
+        setIsSyncing(false);
+        // Force refresh current user session from synchronized local state
+        setCurrentUser(getCurrentUser());
+      }
+    }
+    initAndSync();
   }, []);
 
   // Sync Dark/Light theme class with document root
@@ -199,6 +213,28 @@ export default function App() {
     setActiveExamConfig(null);
     setView("RESULT");
   };
+
+  if (isSyncing) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
+        <div className="p-8 max-w-md w-full text-center space-y-6">
+          <div className="relative inline-flex">
+            <div className="absolute inset-0 bg-indigo-500/10 blur-xl rounded-full animate-pulse-slow"></div>
+            <div className="relative bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-3xl shadow-xl flex items-center justify-center">
+              <svg className="animate-spin h-8 w-8 text-indigo-650 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+          </div>
+          <div className="space-y-2 animate-pulse">
+            <h2 className="text-xl font-bold uppercase tracking-tight text-slate-900 dark:text-white">Connecting to Central Server</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">Synchronizing latest exam questions and student profiles...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"} transition-colors duration-300`}>

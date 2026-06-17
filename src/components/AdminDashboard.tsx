@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import * as XLSX from "xlsx";
 import { User, Subject, Question, UserRole } from "../types";
@@ -11,7 +11,7 @@ import {
   getActivityLogs,
   logActivity
 } from "../data/questionDatabase";
-import { getResultsFromDB } from "../lib/results";
+import { getResultsFromDB, saveResultsToDB } from "../lib/results";
 import LucideIcon from "./LucideIcon";
 import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 import {
@@ -80,6 +80,31 @@ export default function AdminDashboard({
   const [dragActive, setDragActive] = useState(false);
   const [activeImportTab, setActiveImportTab] = useState<"file" | "paste">("file");
   const [importSubjectOverride, setImportSubjectOverride] = useState<string>("auto");
+
+  // Supabase synchronization status state
+  const [supabaseStatus, setSupabaseStatus] = useState<{
+    supabaseConfigured: boolean;
+    supabaseConnected: boolean;
+    tableExists: boolean;
+    error: string | null;
+  } | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
+  const [showSqlGuide, setShowSqlGuide] = useState(false);
+
+  useEffect(() => {
+    async function checkSupabase() {
+      try {
+        const res = await fetch("/api/db/status");
+        if (res.ok) {
+          const data = await res.json();
+          setSupabaseStatus(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch Supabase integration status", e);
+      }
+    }
+    checkSupabase();
+  }, [questions, results]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -676,6 +701,130 @@ export default function AdminDashboard({
                     <span className="font-mono text-blue-600 dark:text-blue-400 text-xs">20 - 80 questions</span>
                   </div>
                 </div>
+
+                {/* SUPABASE MULTI-DEVICE CLOUD SYNC CARD */}
+                <div className={`p-6 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} space-y-4 shadow-sm`}>
+                  <div className="flex justify-between items-center border-b-2 pb-2 border-slate-100 dark:border-slate-800">
+                    <h4 className="font-black text-xs uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <LucideIcon name="CloudLightning" className="text-amber-500" /> Multi-Device Cloud Sync
+                    </h4>
+                    <span className="text-[8px] bg-slate-105 dark:bg-slate-950 px-2 py-0.5 rounded font-black text-indigo-500">SUPABASE</span>
+                  </div>
+
+                  {supabaseStatus ? (
+                    <div className="space-y-3 text-xs">
+                      {/* Scenario 1: Supabase Fully Active and Configured */}
+                      {supabaseStatus.supabaseConfigured && supabaseStatus.supabaseConnected && supabaseStatus.tableExists && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/20 p-3 rounded-xl">
+                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-505 animate-ping"></div>
+                            <div className="leading-tight">
+                              <p className="font-bold text-emerald-600 dark:text-emerald-450">Cloud Connection Active</p>
+                              <p className="text-[10px] text-slate-400">Sync is live across all gadget browsers!</p>
+                            </div>
+                          </div>
+                          
+                          <div className="p-3 bg-slate-50 dark:bg-slate-955 border border-slate-100 dark:border-slate-800 rounded-xl space-y-2">
+                            <p className="font-bold text-slate-600 dark:text-slate-350 text-[11px] uppercase tracking-wider">Storage Sync Verified</p>
+                            <div className="grid grid-cols-2 gap-2 text-[10px] font-semibold text-slate-550 font-mono">
+                              <div className="bg-slate-100 dark:bg-slate-900 p-1.5 rounded flex items-center justify-between">
+                                <span>DB Table:</span> <span className="text-emerald-550">READY</span>
+                              </div>
+                              <div className="bg-slate-100 dark:bg-slate-900 p-1.5 rounded flex items-center justify-between">
+                                <span>Sync:</span> <span className="text-emerald-555">LIVE</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Scenario 2: Configured but Table Missing */}
+                      {supabaseStatus.supabaseConfigured && (!supabaseStatus.tableExists || !supabaseStatus.supabaseConnected) && (
+                        <div className="space-y-3">
+                          <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl space-y-1.5">
+                            <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
+                              <LucideIcon name="AlertTriangle" size={14} />
+                              <span>Table Creation Required</span>
+                            </div>
+                            <p className="text-[10.5px] text-slate-400 leading-normal">
+                              Keys detected, but table <code className="font-mono text-xs text-rose-500">cbt_sync_store</code> needs setup in your Supabase SQL Editor.
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => setShowSqlGuide(!showSqlGuide)}
+                            className="w-full py-2 bg-amber-600 hover:bg-amber-705 text-white rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <LucideIcon name="Code" size={12} />
+                            {showSqlGuide ? "Hide Setup Guide" : "Get Database Setup SQL"}
+                          </button>
+
+                          {showSqlGuide && (
+                            <div className="space-y-2 p-3 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl">
+                              <p className="text-[10px] text-slate-400 font-medium leading-normal">
+                                1. Open your <strong>Supabase Dashboard</strong>.<br />
+                                2. Go to <strong>SQL Editor</strong> &gt; <strong>New Query</strong>.<br />
+                                3. Paste the code below and click <strong>Run</strong>:
+                              </p>
+                              <div className="relative">
+                                <pre className="text-[9px] font-mono p-2.5 bg-slate-900 text-emerald-400 rounded-lg overflow-x-auto border border-slate-800 select-all max-h-40">
+{`CREATE TABLE IF NOT EXISTS cbt_sync_store (
+  key TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;`}
+                                </pre>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`CREATE TABLE IF NOT EXISTS cbt_sync_store (
+  key TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;`);
+                                    setSqlCopied(true);
+                                    setTimeout(() => setSqlCopied(false), 2000);
+                                  }}
+                                  className="absolute top-1 right-1 bg-slate-800 hover:bg-slate-705 border border-slate-755 p-1 rounded font-bold text-[9px] uppercase tracking-wider text-white"
+                                >
+                                  {sqlCopied ? "Copied!" : "Copy SQL"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Scenario 3: Supabase Keys Unconfigured */}
+                      {!supabaseStatus.supabaseConfigured && (
+                        <div className="space-y-3">
+                          <div className="bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 p-3.5 rounded-xl space-y-1">
+                            <p className="font-bold text-indigo-500 dark:text-indigo-400">Server fallback cached</p>
+                            <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                              Currently synchronizing multiple devices via live full-stack memory fallback.
+                            </p>
+                          </div>
+                          
+                          <div className="text-[10px] text-slate-400 leading-normal border-t border-slate-100 dark:border-slate-800 pt-3 space-y-1">
+                            <strong>To activate secure permanent Cloud Sync:</strong>
+                            <ol className="list-decimal pl-3.5 mt-1 space-y-1">
+                              <li>Open the <strong>Secrets Settings</strong> in your AI Studio dashboard menu.</li>
+                              <li>Add <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-rose-500 px-1 py-0.5 rounded">SUPABASE_URL</code></li>
+                              <li>Add <code className="font-mono text-[10px] bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-rose-500 px-1 py-0.5 rounded">SUPABASE_ANON_KEY</code></li>
+                            </ol>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin h-5 w-5 border-2 border-indigo-600 border-t-transparent rounded-full" />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1127,7 +1276,7 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
               if (confirm("Are you sure you want to delete this candidate result permanently?")) {
                 const updated = results.filter(r => r.id !== idToDelete);
                 setResults(updated);
-                localStorage.setItem("FF_CBT_RESULTS", JSON.stringify(updated));
+                saveResultsToDB(updated);
                 logActivity(user.id, user.fullName, UserRole.ADMIN, "Delete CBT Result", `Permanently removed student result record ID: ${idToDelete}.`);
               }
             };

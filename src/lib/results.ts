@@ -1,5 +1,6 @@
 import { Result, Question, BookmarkedQuestion } from "../types";
 import { logActivity } from "../data/questionDatabase";
+import { pushCollectionToServer } from "./sync";
 
 const DEFAULT_MOCK_RESULTS: Result[] = [
   {
@@ -93,10 +94,15 @@ export function getResultsFromDB(): Result[] {
   }
 }
 
+export function saveResultsToDB(results: Result[]) {
+  localStorage.setItem("FF_CBT_RESULTS", JSON.stringify(results));
+  pushCollectionToServer("results", results);
+}
+
 export function saveResult(result: Result) {
   const current = getResultsFromDB();
   current.unshift(result);
-  localStorage.setItem("FF_CBT_RESULTS", JSON.stringify(current));
+  saveResultsToDB(current);
   logActivity(
     result.studentId,
     result.studentName,
@@ -191,6 +197,7 @@ export function toggleBookmarkInDB(userId: string, questionId: string, subjectId
   }
 
   localStorage.setItem("FF_CBT_BOOKMARKS", JSON.stringify(bookmarks));
+  pushCollectionToServer("bookmarks", bookmarks);
   return bookmarked;
 }
 

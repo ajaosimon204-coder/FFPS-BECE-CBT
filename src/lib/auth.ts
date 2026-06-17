@@ -1,5 +1,6 @@
 import { User, UserRole } from "../types";
 import { logActivity } from "../data/questionDatabase";
+import { pushCollectionToServer } from "./sync";
 
 const DEFAULT_USERS: User[] = [
   {
@@ -47,6 +48,7 @@ export function getUsersFromDB(): User[] {
     if (adminUser && adminUser.fullName !== "MR SIMON") {
       adminUser.fullName = "MR SIMON";
       localStorage.setItem("FF_CBT_USERS", JSON.stringify(users));
+      pushCollectionToServer("users", users);
       
       // Also update currently logged in user if they are the admin
       const activeStr = localStorage.getItem("FF_CBT_CURRENT_USER");
@@ -112,6 +114,9 @@ export function registerStudent(fullName: string, email: string, pass: string): 
   localStorage.setItem("FF_CBT_USERS", JSON.stringify(users));
   localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify(passwords));
   localStorage.setItem("FF_CBT_CURRENT_USER", JSON.stringify(newUser));
+  
+  pushCollectionToServer("users", users);
+  pushCollectionToServer("passwords", passwords);
   
   logActivity(newUser.id, newUser.fullName, newUser.role, "Register", `New student successfully registered with ID: ${studentId}`);
   

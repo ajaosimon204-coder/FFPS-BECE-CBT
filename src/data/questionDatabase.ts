@@ -1,4 +1,5 @@
 import { Question } from "../types";
+import { pushCollectionToServer } from "../lib/sync";
 
 // High-quality core seed questions (at least 4-5 per subject) to guarantee initial standard content
 const HANDCRAFTED_SEEDS: Record<string, Omit<Question, "id">[]> = {
@@ -824,6 +825,7 @@ export function initializeDB(): Question[] {
   // Save to LocalStorage
   localStorage.setItem("FF_CBT_QUESTIONS", JSON.stringify(fullList));
   localStorage.setItem("FF_CBT_DB_INITIALIZED", "true");
+  localStorage.setItem("FF_CBT_DB_V5_STABLE", "true");
 
   // Create default activity logs
   const prepLogs = [
@@ -844,14 +846,20 @@ export function initializeDB(): Question[] {
 
 export function getQuestionsFromDB(): Question[] {
   const current = localStorage.getItem("FF_CBT_QUESTIONS");
-  const forceRefresh = !localStorage.getItem("FF_CBT_DB_V4_REPEATS_FIXED");
+  const isStable = localStorage.getItem("FF_CBT_DB_V5_STABLE") === "true";
   
-  // Check if it's the old database format or missing our duplicate prevention overhaul
-  if (forceRefresh || (current && (current.includes('"cca"') || current.includes('"basic_science"') || !current.includes('"basic_science_tech"') || !current.includes("REVISION QUIZ:")))) {
-    localStorage.removeItem("FF_CBT_QUESTIONS");
-    localStorage.removeItem("FF_CBT_DB_INITIALIZED");
-    localStorage.setItem("FF_CBT_DB_V4_REPEATS_FIXED", "true");
-    return initializeDB();
+  if (!isStable) {
+    // We are migrating to the V5 Stable storage mode.
+    // To prevent silent wipes of custom user data while cleaning up the old structure, 
+    // we only do a complete reset if we are absolutely sure no custom questions were uploaded yet.
+    const hasUploads = current && current.includes('"isUploaded":true');
+    if (!current || !hasUploads) {
+      localStorage.removeItem("FF_CBT_QUESTIONS");
+      localStorage.removeItem("FF_CBT_DB_INITIALIZED");
+      localStorage.setItem("FF_CBT_DB_V5_STABLE", "true");
+      return initializeDB();
+    }
+    localStorage.setItem("FF_CBT_DB_V5_STABLE", "true");
   }
   
   if (!current) {
@@ -866,6 +874,7 @@ export function getQuestionsFromDB(): Question[] {
 
 export function saveQuestionsToDB(questions: Question[]) {
   localStorage.setItem("FF_CBT_QUESTIONS", JSON.stringify(questions));
+  pushCollectionToServer("questions", questions);
 }
 
 export function addQuestionToDB(q: Omit<Question, "id">): Question {
@@ -874,6 +883,7 @@ export function addQuestionToDB(q: Omit<Question, "id">): Question {
   const fullQ: Question = {
     ...q,
     id: newId,
+    isUploaded: true, // Prioritize manually-added questions exactly like Excel uploads!
     originalOptions: [...q.options]
   };
   list.unshift(fullQ); // Add to the front
@@ -915,8 +925,10 @@ export function logActivity(userId: string, userName: string, role: string, acti
       details
     };
     logs.unshift(newLog);
+    const sliced = logs.slice(0, 200);
     // Keep last 200 logs
-    localStorage.setItem("FF_CBT_ACTIVITY_LOGS", JSON.stringify(logs.slice(0, 200)));
+    localStorage.setItem("FF_CBT_ACTIVITY_LOGS", JSON.stringify(sliced));
+    pushCollectionToServer("logs", sliced);
   } catch (e) {
     console.error("Failed to log activity", e);
   }
