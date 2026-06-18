@@ -1,13 +1,124 @@
 import { getQuestionsFromDB, initializeDB } from "../data/questionDatabase";
 import { getUsersFromDB } from "./auth";
 import { getResultsFromDB } from "./results";
+import { createClient } from "@supabase/supabase-js";
+
+// Safe Singleton direct browser Supabase connection
+let clientSupabaseInstance: any = null;
+
+export function getClientSupabase() {
+  if (clientSupabaseInstance) return clientSupabaseInstance;
+
+  let supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").trim();
+  let supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || "").trim();
+
+  // Strip possible outer quotes
+  if (supabaseUrl.startsWith('"') && supabaseUrl.endsWith('"')) supabaseUrl = supabaseUrl.slice(1, -1).trim();
+  if (supabaseUrl.startsWith("'") && supabaseUrl.endsWith("'")) supabaseUrl = supabaseUrl.slice(1, -1).trim();
+  while (supabaseUrl.endsWith("/")) supabaseUrl = supabaseUrl.slice(0, -1).trim();
+  if (supabaseUrl.endsWith("/rest/v1")) supabaseUrl = supabaseUrl.substring(0, supabaseUrl.length - 8).trim();
+  while (supabaseUrl.endsWith("/")) supabaseUrl = supabaseUrl.slice(0, -1).trim();
+
+  if (supabaseKey.startsWith('"') && supabaseKey.endsWith('"')) supabaseKey = supabaseKey.slice(1, -1).trim();
+  if (supabaseKey.startsWith("'") && supabaseKey.endsWith("'")) supabaseKey = supabaseKey.slice(1, -1).trim();
+
+  if (supabaseUrl && supabaseKey) {
+    try {
+      clientSupabaseInstance = createClient(supabaseUrl, supabaseKey);
+      console.log("[Client Sync Engine] Direct Browser-to-Supabase fallback link activated successfully.");
+      return clientSupabaseInstance;
+    } catch (e) {
+      console.error("[Client Sync Engine] Failed to initialize direct browser Supabase link:", e);
+    }
+  }
+  return null;
+}
+
+// Fallback direct browser-to-Supabase sync if backend is uncontactable (static deployment like Vercel/Netlify)
+export async function syncDirectWithClientSupabase(): Promise<boolean> {
+  const client = getClientSupabase();
+  if (!client) {
+    console.log("[Client Sync] Ephemeral standalone state. Sticking to offline local storage.");
+    return false;
+  }
+
+  try {
+    const { data, error } = await client.from("cbt_sync_store").select("*");
+    if (error) {
+      console.warn("[Client Sync] Direct browser Supabase request returned read error:", error.message);
+      return false;
+    }
+
+    if (data && data.length > 0) {
+      const db: any = {};
+      data.forEach((row: any) => {
+        db[row.key] = row.data;
+      });
+
+      if (db.questions) localStorage.setItem("FF_CBT_QUESTIONS", JSON.stringify(db.questions));
+      if (db.users) localStorage.setItem("FF_CBT_USERS", JSON.stringify(db.users));
+      if (db.passwords) localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify(db.passwords));
+      if (db.results) localStorage.setItem("FF_CBT_RESULTS", JSON.stringify(db.results));
+      if (db.bookmarks) localStorage.setItem("FF_CBT_BOOKMARKS", JSON.stringify(db.bookmarks));
+      if (db.logs) localStorage.setItem("FF_CBT_ACTIVITY_LOGS", JSON.stringify(db.logs));
+      
+      localStorage.setItem("FF_CBT_DB_INITIALIZED", "true");
+      localStorage.setItem("FF_CBT_DB_V5_STABLE", "true");
+
+      const currentVersion = parseInt(localStorage.getItem("FF_CBT_DB_VERSION") || "0", 10);
+      localStorage.setItem("FF_CBT_DB_VERSION", String(currentVersion + 1));
+
+      window.dispatchEvent(new Event("cbt-db-synced"));
+      console.log("=== [Client Sync] Hydrated browser memory directly with cloud Supabase! ===");
+      return true;
+    } else {
+      console.log("[Client Sync] Cloud Supabase cbt_sync_store is empty. Seed-populating with local defaults...");
+      const defaultQuestions = getQuestionsFromDB();
+      const defaultUsers = getUsersFromDB();
+      const defaultPasswords = JSON.parse(localStorage.getItem("FF_CBT_PASSWORDS") || "{}");
+      const defaultResults = getResultsFromDB();
+      const defaultBookmarks = JSON.parse(localStorage.getItem("FF_CBT_BOOKMARKS") || "[]");
+      const defaultLogs = JSON.parse(localStorage.getItem("FF_CBT_ACTIVITY_LOGS") || "[]");
+
+      const collections = {
+        questions: defaultQuestions,
+        users: defaultUsers,
+        passwords: defaultPasswords,
+        results: defaultResults,
+        bookmarks: defaultBookmarks,
+        logs: defaultLogs
+      };
+
+      for (const [key, val] of Object.entries(collections)) {
+        await client.from("cbt_sync_store").upsert({
+          key,
+          data: val,
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      localStorage.setItem("FF_CBT_DB_INITIALIZED", "true");
+      localStorage.setItem("FF_CBT_DB_V5_STABLE", "true");
+      
+      const currentVersion = parseInt(localStorage.getItem("FF_CBT_DB_VERSION") || "0", 10);
+      localStorage.setItem("FF_CBT_DB_VERSION", String(currentVersion + 1));
+
+      window.dispatchEvent(new Event("cbt-db-synced"));
+      console.log("=== [Client Sync] Seeding of cloud Supabase complete! ===");
+      return true;
+    }
+  } catch (err) {
+    console.error("[Client Sync] Direct browser Supabase initialization sync error:", err);
+    return false;
+  }
+}
 
 // Synchronize local browser localStorage with central express server
 export async function syncWithServer(): Promise<boolean> {
   try {
     const response = await fetch("/api/db/get-all");
     if (!response.ok) {
-      throw new Error("Failed to contact central JSS3 CBT Server");
+      throw new Error("Local backend node is offline or unreachable");
     }
     const serverDb = await response.json();
 
@@ -41,7 +152,7 @@ export async function syncWithServer(): Promise<boolean> {
 
       // Notify any active React states to update themselves from storage
       window.dispatchEvent(new Event("cbt-db-synced"));
-      console.log("=== Successfully hydrated localStorage with Central Server State ===");
+      console.log("=== Automatically hydrated localStorage from Express Server ===");
       return true;
     } else {
       // 2. Server database is uninitialized (fresh deployment). 
@@ -81,8 +192,9 @@ export async function syncWithServer(): Promise<boolean> {
       return true;
     }
   } catch (error) {
-    console.error("Failed to perform real-time cloud synchronization:", error);
-    return false;
+    console.log("Failed to contact Express Server api. Entering direct client-side Supabase link...");
+    // Fallback directly to client-side Supabase!
+    return await syncDirectWithClientSupabase();
   }
 }
 
@@ -105,7 +217,33 @@ export async function pushCollectionToServer(key: string, data: any): Promise<bo
     window.dispatchEvent(new Event("cbt-db-synced"));
     return result.success;
   } catch (e) {
-    console.warn("Retrying collection push in background later. Offline state preserved.", e);
+    console.log(`Failed to push collection "${key}" to Express backend. Retrying direct browser Supabase link...`);
+    
+    // Check direct browser link!
+    const client = getClientSupabase();
+    if (client) {
+      try {
+        const { error } = await client.from("cbt_sync_store").upsert({
+          key,
+          data,
+          updated_at: new Date().toISOString()
+        });
+        if (!error) {
+          const currentVersion = parseInt(localStorage.getItem("FF_CBT_DB_VERSION") || "0", 10);
+          localStorage.setItem("FF_CBT_DB_VERSION", String(currentVersion + 1));
+          window.dispatchEvent(new Event("cbt-db-synced"));
+          console.log(`=== [Client Sync] Directly saved "${key}" to Cloud Supabase successfully! ===`);
+          return true;
+        } else {
+          console.warn("[Client Sync] Browser direct write error:", error.message);
+        }
+      } catch (err) {
+        console.error("[Client Sync] Failed direct browser write:", err);
+      }
+    }
+    
+    console.warn("Offline fallback state preserved.", e);
     return false;
   }
 }
+
