@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import LucideIcon from "./LucideIcon";
 import { User } from "../types";
 import { syncWithServer, pushCollectionToServer, getClientSupabase } from "../lib/sync";
+import { SUPABASE_URL } from "../supabaseConfig";
 
 interface DatabaseHealthCheckProps {
   user: User | null;
@@ -94,7 +95,7 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
               supabaseConfigured: true,
               supabaseConnected: false,
               tableExists: false,
-              url: import.meta.env.VITE_SUPABASE_URL || "Configured in Environment",
+              url: import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL || "Configured in Environment",
               error: `Direct link failed: ${error.message}`
             });
             addLog(`Direct browser Supabase connection test failed: ${error.message}`);
@@ -103,7 +104,7 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
               supabaseConfigured: true,
               supabaseConnected: true,
               tableExists: true,
-              url: import.meta.env.VITE_SUPABASE_URL || "Configured in Environment",
+              url: import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL || "Configured in Environment",
               readLatencyMs: 25,
               error: null
             });
@@ -114,7 +115,7 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
             supabaseConfigured: true,
             supabaseConnected: false,
             tableExists: false,
-            url: import.meta.env.VITE_SUPABASE_URL || "Configured in Environment",
+            url: import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL || "Configured in Environment",
             error: `Direct link query execution error: ${directError.message}`
           });
           addLog(`Direct query execution error: ${directError.message}`);

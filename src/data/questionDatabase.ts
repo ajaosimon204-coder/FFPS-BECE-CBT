@@ -866,7 +866,28 @@ export function getQuestionsFromDB(): Question[] {
     return initializeDB();
   }
   try {
-    return JSON.parse(current);
+    const parsedList = JSON.parse(current) as Question[];
+    const healed = parsedList.map((q) => {
+      let ansVal = (q.correctAnswer || "").trim();
+      const cleanAns = ansVal.toLowerCase();
+      let updatedAns = q.correctAnswer;
+      
+      if (cleanAns === "a" || cleanAns === "option a" || cleanAns === "optiona") {
+        updatedAns = q.options[0] || q.correctAnswer;
+      } else if (cleanAns === "b" || cleanAns === "option b" || cleanAns === "optionb") {
+        updatedAns = q.options[1] || q.correctAnswer;
+      } else if (cleanAns === "c" || cleanAns === "option c" || cleanAns === "optionc") {
+        updatedAns = q.options[2] || q.correctAnswer;
+      } else if (cleanAns === "d" || cleanAns === "option d" || cleanAns === "optiond") {
+        updatedAns = q.options[3] || q.correctAnswer;
+      }
+      
+      if (updatedAns !== q.correctAnswer) {
+        return { ...q, correctAnswer: updatedAns };
+      }
+      return q;
+    });
+    return healed;
   } catch (e) {
     return initializeDB();
   }

@@ -386,7 +386,19 @@ export default function AdminDashboard({
           const bVal = optB !== -1 && row[optB] !== undefined ? String(row[optB]).trim() : "";
           const cVal = optC !== -1 && row[optC] !== undefined ? String(row[optC]).trim() : "";
           const dVal = optD !== -1 && row[optD] !== undefined ? String(row[optD]).trim() : "";
-          const ansVal = ansIdx !== -1 && row[ansIdx] !== undefined ? String(row[ansIdx]).trim() : aVal;
+          
+          let ansVal = ansIdx !== -1 && row[ansIdx] !== undefined ? String(row[ansIdx]).trim() : aVal;
+          const cleanAns = ansVal.toLowerCase();
+          if (cleanAns === "a" || cleanAns === "option a" || cleanAns === "optiona") {
+            ansVal = aVal;
+          } else if (cleanAns === "b" || cleanAns === "option b" || cleanAns === "optionb") {
+            ansVal = bVal;
+          } else if (cleanAns === "c" || cleanAns === "option c" || cleanAns === "optionc") {
+            ansVal = cVal;
+          } else if (cleanAns === "d" || cleanAns === "option d" || cleanAns === "optiond") {
+            ansVal = dVal;
+          }
+
           const expVal = expIdx !== -1 && row[expIdx] !== undefined ? String(row[expIdx]).trim() : "Verified JSS3 BECE CBT Guideline.";
           
           let diffVal: "Easy" | "Medium" | "Hard" = "Medium";
@@ -528,13 +540,26 @@ export default function AdminDashboard({
       const list = getQuestionsFromDB();
       const newId = `manual_add_${Date.now()}`;
       const opts = [newQForm.optA, newQForm.optB, newQForm.optC, newQForm.optD].filter(Boolean);
+      
+      let ansVal = (newQForm.correctAnswer || newQForm.optA).trim();
+      const cleanAns = ansVal.toLowerCase();
+      if (cleanAns === "a" || cleanAns === "option a" || cleanAns === "optiona") {
+        ansVal = newQForm.optA;
+      } else if (cleanAns === "b" || cleanAns === "option b" || cleanAns === "optionb") {
+        ansVal = newQForm.optB;
+      } else if (cleanAns === "c" || cleanAns === "option c" || cleanAns === "optionc") {
+        ansVal = newQForm.optC;
+      } else if (cleanAns === "d" || cleanAns === "option d" || cleanAns === "optiond") {
+        ansVal = newQForm.optD;
+      }
+
       const fullQ: Question = {
         id: newId,
         subjectId: newQForm.subjectId,
         questionText: newQForm.questionText,
         options: opts,
         originalOptions: [...opts],
-        correctAnswer: newQForm.correctAnswer || newQForm.optA,
+        correctAnswer: ansVal,
         explanation: newQForm.explanation || "No explanation provided.",
         difficulty: newQForm.difficulty,
         topic: newQForm.topic || "General Study",
@@ -573,7 +598,25 @@ export default function AdminDashboard({
       const list = getQuestionsFromDB();
       const idx = list.findIndex((q) => q.id === editingQuestion.id);
       if (idx !== -1) {
-        list[idx] = { ...editingQuestion, originalOptions: [...editingQuestion.options] };
+        let ansVal = (editingQuestion.correctAnswer || "").trim();
+        const cleanAns = ansVal.toLowerCase();
+        let updatedAns = editingQuestion.correctAnswer;
+        
+        if (cleanAns === "a" || cleanAns === "option a" || cleanAns === "optiona") {
+          updatedAns = editingQuestion.options[0] || editingQuestion.correctAnswer;
+        } else if (cleanAns === "b" || cleanAns === "option b" || cleanAns === "optionb") {
+          updatedAns = editingQuestion.options[1] || editingQuestion.correctAnswer;
+        } else if (cleanAns === "c" || cleanAns === "option c" || cleanAns === "optionc") {
+          updatedAns = editingQuestion.options[2] || editingQuestion.correctAnswer;
+        } else if (cleanAns === "d" || cleanAns === "option d" || cleanAns === "optiond") {
+          updatedAns = editingQuestion.options[3] || editingQuestion.correctAnswer;
+        }
+
+        list[idx] = { 
+          ...editingQuestion, 
+          correctAnswer: updatedAns,
+          originalOptions: [...editingQuestion.options] 
+        };
         const syncOk = await saveQuestionsToDB(list);
         
         logActivity(user.id, user.fullName, UserRole.ADMIN, "Edit Question", `Admin edited question: "${editingQuestion.questionText.slice(0, 40)}..."`);
