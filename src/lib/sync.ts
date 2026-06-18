@@ -2,6 +2,7 @@ import { getQuestionsFromDB, initializeDB } from "../data/questionDatabase";
 import { getUsersFromDB } from "./auth";
 import { getResultsFromDB } from "./results";
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../supabaseConfig";
 
 // Safe Singleton direct browser Supabase connection
 let clientSupabaseInstance: any = null;
@@ -9,8 +10,8 @@ let clientSupabaseInstance: any = null;
 export function getClientSupabase() {
   if (clientSupabaseInstance) return clientSupabaseInstance;
 
-  let supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").trim();
-  let supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || "").trim();
+  let supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL || "").trim();
+  let supabaseKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY || "").trim();
 
   // Strip possible outer quotes
   if (supabaseUrl.startsWith('"') && supabaseUrl.endsWith('"')) supabaseUrl = supabaseUrl.slice(1, -1).trim();

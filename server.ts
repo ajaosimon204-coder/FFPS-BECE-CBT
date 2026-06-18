@@ -3,12 +3,13 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./src/supabaseConfig";
 
 const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), "cbt_server_db.json");
 
-// Connect to external Supabase if keys exist in environment
-let supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+// Connect to external Supabase if keys exist in environment or config
+let supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || SUPABASE_URL || "").trim();
 if (supabaseUrl.startsWith('"') && supabaseUrl.endsWith('"')) {
   supabaseUrl = supabaseUrl.slice(1, -1).trim();
 } else if (supabaseUrl.startsWith("'") && supabaseUrl.endsWith("'")) {
@@ -30,7 +31,7 @@ while (supabaseUrl.endsWith("/")) {
   supabaseUrl = supabaseUrl.slice(0, -1).trim();
 }
 
-let supabaseKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "").trim();
+let supabaseKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY || "").trim();
 if (supabaseKey.startsWith('"') && supabaseKey.endsWith('"')) {
   supabaseKey = supabaseKey.slice(1, -1).trim();
 } else if (supabaseKey.startsWith("'") && supabaseKey.endsWith("'")) {

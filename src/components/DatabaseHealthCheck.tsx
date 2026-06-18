@@ -120,8 +120,8 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
           addLog(`Direct query execution error: ${directError.message}`);
         }
       } else {
-        setErrorMessage("Unable to contact central server diagnostic endpoint. Direct client-side Supabase credentials (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are also unconfigured.");
-        addLog("Error checking status: Central express backend is unreachable, and no client-side Supabase keys detected.");
+        setErrorMessage("Central server diagnostic offline. Direct cloud database keys are also unconfigured. To enable cross-device syncing on GitHub/Vercel/Netlify, create a free database at supabase.com and paste your project values inside the '/src/supabaseConfig.ts' file in your code editor!");
+        addLog("Alert: Central sever is unreachable and no Supabase keys were found in environment or '/src/supabaseConfig.ts'. Direct device-to-cloud link is offline.");
       }
     } finally {
       setLoading(false);
