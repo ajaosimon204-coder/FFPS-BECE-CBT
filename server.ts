@@ -178,10 +178,14 @@ async function startServer() {
         return res.json({ ...localDb, usingSupabaseFallback: true, syncError: error.message, version: dbChangeCounter });
       }
 
-      const db: any = { initialized: true, usingSupabaseFallback: false };
+      const db: any = { initialized: false, usingSupabaseFallback: false };
       data.forEach((row: any) => {
         db[row.key] = row.data;
       });
+
+      if (db.questions && db.questions.length > 0) {
+        db.initialized = true;
+      }
 
       // Maintain server-local DB mirrored state in file as secondary backup
       saveServerDb({ ...localDb, ...db });

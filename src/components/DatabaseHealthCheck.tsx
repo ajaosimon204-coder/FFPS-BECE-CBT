@@ -22,6 +22,8 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
     error: string | null;
   } | null>(null);
 
+  const [rlsBlocked, setRlsBlocked] = useState(false);
+
   const [diagnosticLogs, setDiagnosticLogs] = useState<string[]>([
     "Diagnostic system loaded.",
     "Awaiting manual read/write testing commands..."
@@ -116,11 +118,11 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
     setLoading(true);
     setSuccessMessage(null);
     setErrorMessage(null);
+    setRlsBlocked(false);
     addLog("=== Initiating Database Write (Upsert) Test ===");
     try {
       const start = Date.now();
       
-      // Load current logs, append a health check trace, and push
       const currentLogsStr = localStorage.getItem("FF_CBT_ACTIVITY_LOGS") || "[]";
       let logs = [];
       try {
@@ -140,17 +142,44 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
 
       const updatedLogs = [tracer, ...logs].slice(0, 100);
       
-      const success = await pushCollectionToServer("logs", updatedLogs);
-      if (success) {
-        const duration = Date.now() - start;
-        setSuccessMessage(`Database Write Test PASSED! Appended diagnostic trace to activity log under ${duration}ms.`);
-        addLog(`Write Test PASSED in ${duration}ms! Activity log successfully mirrored to backend.`);
+      const response = await fetch("/api/db/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "logs", data: updatedLogs })
+      });
+
+      const resData = await response.json();
+      const elapsed = Date.now() - start;
+
+      if (!response.ok || !resData.success || resData.error) {
+        const errMsg = resData.error || `HTTP ${response.status} failed`;
         
-        // Save locally to reflect live right away
-        localStorage.setItem("FF_CBT_ACTIVITY_LOGS", JSON.stringify(updatedLogs));
-      } else {
-        throw new Error("Central server rejected or failed collection update write request");
+        // If it's an RLS issue
+        if (errMsg.toLowerCase().includes("row-level security") || errMsg.toLowerCase().includes("policy") || errMsg.toLowerCase().includes("rls")) {
+          setRlsBlocked(true);
+        }
+        
+        throw new Error(errMsg);
       }
+
+      // Check if savedToLocalOnly with some silent error (like RLS)
+      if (resData.savedToLocalOnly && resData.error) {
+        const errMsg = resData.error;
+        if (errMsg.toLowerCase().includes("row-level security") || errMsg.toLowerCase().includes("policy") || errMsg.toLowerCase().includes("rls")) {
+          setRlsBlocked(true);
+        }
+        throw new Error(`Local Fallback Only: ${errMsg}`);
+      }
+
+      setSuccessMessage(`Database Write Test PASSED! Appended diagnostic trace to activity log under ${elapsed}ms.`);
+      addLog(`Write Test PASSED in ${elapsed}ms! Activity log successfully mirrored to backend.`);
+      
+      localStorage.setItem("FF_CBT_ACTIVITY_LOGS", JSON.stringify(updatedLogs));
+      
+      if (resData.version !== undefined) {
+        localStorage.setItem("FF_CBT_DB_VERSION", String(resData.version));
+      }
+      window.dispatchEvent(new Event("cbt-db-synced"));
     } catch (err: any) {
       setErrorMessage(`Write Test FAILED: ${err.message}`);
       addLog(`Write Test Failed: ${err.message}`);
@@ -239,10 +268,48 @@ export default function DatabaseHealthCheck({ user, onClose }: DatabaseHealthChe
         </div>
       )}
 
-      {errorMessage && (
+       {errorMessage && (
         <div className="p-4 border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold rounded-2xl flex items-center gap-2.5">
           <LucideIcon name="AlertTriangle" size={18} className="shrink-0" />
           <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {rlsBlocked && (
+        <div className="p-6 border-2 border-amber-500/30 bg-amber-500/5 rounded-3xl space-y-4 shadow-sm text-slate-800 dark:text-slate-200">
+          <div className="flex gap-3">
+            <div className="p-3 bg-chip bg-amber-500 text-slate-950 rounded-2xl max-h-fit">
+              <LucideIcon name="ShieldAlert" size={22} />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-black uppercase tracking-tight text-amber-600 dark:text-amber-400">Row-Level Security (RLS) Active</h4>
+              <p className="text-xs text-slate-650 dark:text-slate-400 font-semibold leading-normal">
+                Your remote Supabase table exists, but <strong>Row-Level Security (RLS) is active</strong> and blocking client browsers from updating the centralized records. Without disabling RLS on this table, multiple devices cannot share student registries or exam sessions.
+              </p>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-slate-950 border border-slate-900 rounded-2xl space-y-3 font-semibold text-xs leading-normal text-slate-350">
+            <p className="font-mono text-[11px] text-amber-450 border-b border-slate-900 pb-2 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span> INSTANT SQL RESOLUTION SERVICE
+            </p>
+            <p>
+              Please execute this single SQL statement inside your <strong>Supabase Dashboard -&gt; SQL Editor</strong> to unlock anonymous writes instantly:
+            </p>
+            <div className="bg-slate-900 border border-slate-850 p-3.5 rounded-xl font-mono text-[11px] text-indigo-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <code className="select-all">ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;</code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText("ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;");
+                  alert("SQL script successfully copied to clipboard! Paste it inside Supabase Console SQL Editor and click 'Run'.");
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/20 hover:border-indigo-500/40 text-indigo-400 dark:text-indigo-300 rounded-xl text-[10px] uppercase font-black tracking-wider transition-all cursor-pointer text-center shrink-0"
+              >
+                Copy SQL Command
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
