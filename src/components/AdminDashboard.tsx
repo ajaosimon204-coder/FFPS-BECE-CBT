@@ -13,6 +13,7 @@ import {
 } from "../data/questionDatabase";
 import { getResultsFromDB, saveResultsToDB } from "../lib/results";
 import DatabaseHealthCheck from "./DatabaseHealthCheck";
+import { pushCollectionToServer } from "../lib/sync";
 import LucideIcon from "./LucideIcon";
 import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 import {
@@ -39,12 +40,32 @@ export default function AdminDashboard({
   darkMode,
   setDarkMode
 }: AdminDashboardProps) {
-  const [activeSegment, setActiveSegment] = useState<"stats" | "bank" | "results" | "logs" | "diagnostics">("stats");
+  const [activeSegment, setActiveSegment] = useState<"stats" | "bank" | "results" | "logs" | "diagnostics" | "users">("stats");
   const [questions, setQuestions] = useState<Question[]>(getQuestionsFromDB());
   const [results, setResults] = useState<any[]>(getResultsFromDB());
+  const [users, setUsers] = useState<User[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("FF_CBT_USERS") || "[]");
+    } catch {
+      return [];
+    }
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [activityLogs, setActivityLogs] = useState<any[]>(getActivityLogs());
+
+  // Accounts / Users management states
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [userFilterRole, setUserFilterRole] = useState<string>("all");
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    role: UserRole.STUDENT
+  });
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userFormError, setUserFormError] = useState("");
 
   // Result view filter states
   const [resultSearchQuery, setResultSearchQuery] = useState("");
@@ -121,6 +142,12 @@ export default function AdminDashboard({
       } catch (e) {
         console.error("Failed to parse activity logs on sync:", e);
       }
+      try {
+        const updatedUsersStr = localStorage.getItem("FF_CBT_USERS") || "[]";
+        setUsers(JSON.parse(updatedUsersStr));
+      } catch (e) {
+        console.error("Failed to parse users on sync:", e);
+      }
     }
 
     // Subscribe to immediate real-time event notifications or focus shifts
@@ -132,6 +159,141 @@ export default function AdminDashboard({
       window.removeEventListener("focus", handleCbtDbSynced);
     };
   }, []);
+
+  const handleAddUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserFormError("");
+    const emailLower = newUserForm.email.toLowerCase().trim();
+    if (users.some(u => u.email.toLowerCase() === emailLower)) {
+      setUserFormError("This email is already registered inside CBT Database!");
+      return;
+    }
+
+    try {
+      setIsCloudSaving(true);
+      setCloudSaveMessage("Adding user and pushing to central storage...");
+      
+      let studentId: string | undefined;
+      if (newUserForm.role === UserRole.STUDENT) {
+        const studentNum = users.filter(u => u.role === UserRole.STUDENT).length + 101;
+        studentId = `FF/JSS3/${studentNum}`;
+      }
+
+      const newUserObj: User = {
+        id: newUserForm.role === UserRole.ADMIN ? `admin_${Date.now()}` : `stud_${Date.now()}`,
+        email: emailLower,
+        fullName: newUserForm.fullName.trim(),
+        role: newUserForm.role,
+        registrationDate: new Date().toISOString(),
+        ...(studentId ? { studentId } : {})
+      };
+
+      const updatedUsers = [...users, newUserObj];
+      setUsers(updatedUsers);
+      localStorage.setItem("FF_CBT_USERS", JSON.stringify(updatedUsers));
+
+      // Passwords update
+      const passwords = JSON.parse(localStorage.getItem("FF_CBT_PASSWORDS") || "{}");
+      passwords[emailLower] = newUserForm.password || "password123";
+      localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify(passwords));
+
+      // Push to central database
+      await pushCollectionToServer("users", updatedUsers);
+      await pushCollectionToServer("passwords", passwords);
+
+      logActivity(user.id, user.fullName, UserRole.ADMIN, "Create User Account", `Administrator created new ${newUserForm.role.toLowerCase()} account: ${newUserObj.fullName} (${newUserObj.email})`);
+
+      setIsAddUserOpen(false);
+      setNewUserForm({
+        fullName: "",
+        email: "",
+        password: "",
+        role: UserRole.STUDENT
+      });
+    } catch (err: any) {
+      setUserFormError(err.message || "Failed to create user.");
+    } finally {
+      setIsCloudSaving(false);
+    }
+  };
+
+  const handleEditUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setUserFormError("");
+
+    const emailLower = editingUser.email.toLowerCase().trim();
+    const duplicate = users.find(u => u.email.toLowerCase() === emailLower && u.id !== editingUser.id);
+    if (duplicate) {
+      setUserFormError("This email is already registered inside CBT Database!");
+      return;
+    }
+
+    try {
+      setIsCloudSaving(true);
+      setCloudSaveMessage("Updating user record dynamically...");
+
+      let studentId = editingUser.studentId;
+      if (editingUser.role === UserRole.STUDENT && !studentId) {
+        const studentNum = users.filter(u => u.role === UserRole.STUDENT).length + 101;
+        studentId = `FF/JSS3/${studentNum}`;
+      } else if (editingUser.role !== UserRole.STUDENT) {
+        studentId = undefined;
+      }
+
+      const updatedUserObj: User = {
+        ...editingUser,
+        fullName: editingUser.fullName.trim(),
+        email: emailLower,
+        studentId
+      };
+
+      const updatedUsers = users.map(u => u.id === editingUser.id ? updatedUserObj : u);
+      setUsers(updatedUsers);
+      localStorage.setItem("FF_CBT_USERS", JSON.stringify(updatedUsers));
+
+      await pushCollectionToServer("users", updatedUsers);
+
+      logActivity(user.id, user.fullName, UserRole.ADMIN, "Update User Account", `Administrator updated account: ${updatedUserObj.fullName} (${updatedUserObj.email})`);
+
+      setEditingUser(null);
+    } catch (err: any) {
+      setUserFormError(err.message || "Failed to update user.");
+    } finally {
+      setIsCloudSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (userToDelete: User) => {
+    if (userToDelete.id === user.id) {
+      alert("Operational constraint: You cannot delete your own active session!");
+      return;
+    }
+    if (confirm(`Are you sure you want to delete account: ${userToDelete.fullName} (${userToDelete.email}) permanently? This will prevent them from signing in.`)) {
+      try {
+        setIsCloudSaving(true);
+        setCloudSaveMessage("Removing user registration from DB...");
+
+        const updatedUsers = users.filter(u => u.id !== userToDelete.id);
+        setUsers(updatedUsers);
+        localStorage.setItem("FF_CBT_USERS", JSON.stringify(updatedUsers));
+
+        // Remove passwords entry to keep it clean
+        const passwords = JSON.parse(localStorage.getItem("FF_CBT_PASSWORDS") || "{}");
+        delete passwords[userToDelete.email.toLowerCase()];
+        localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify(passwords));
+
+        await pushCollectionToServer("users", updatedUsers);
+        await pushCollectionToServer("passwords", passwords);
+
+        logActivity(user.id, user.fullName, UserRole.ADMIN, "Delete User Account", `Administrator permanently deleted user: ${userToDelete.fullName} (${userToDelete.email})`);
+      } catch (err: any) {
+        alert("Failed to delete user: " + err.message);
+      } finally {
+        setIsCloudSaving(false);
+      }
+    }
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -323,14 +485,17 @@ export default function AdminDashboard({
   };
 
   const resultsList = results;
-  const studentsStr = localStorage.getItem("FF_CBT_USERS") || "[]";
-  const users = JSON.parse(studentsStr);
   const studentsCount = users.filter((u: any) => u.role === "STUDENT").length;
 
   const handleRefreshDB = () => {
     setQuestions(getQuestionsFromDB());
     setActivityLogs(getActivityLogs());
     setResults(getResultsFromDB());
+    try {
+      setUsers(JSON.parse(localStorage.getItem("FF_CBT_USERS") || "[]"));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleOpenAdd = () => {
@@ -777,6 +942,12 @@ export default function AdminDashboard({
             <LucideIcon name="Award" size={13} /> Student Exam Results ({results.length})
           </button>
           <button
+            onClick={() => setActiveSegment("users")}
+            className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "users" ? "border-indigo-600 text-indigo-650 dark:text-indigo-400 font-bold" : "border-transparent text-slate-405 hover:text-slate-600"}`}
+          >
+            <LucideIcon name="Users" size={13} /> Registered Accounts ({users.length})
+          </button>
+          <button
             onClick={() => setActiveSegment("logs")}
             className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "logs" ? "border-indigo-600 text-indigo-650 dark:text-indigo-455" : "border-transparent text-slate-405 hover:text-slate-600"}`}
           >
@@ -784,7 +955,7 @@ export default function AdminDashboard({
           </button>
           <button
             onClick={() => setActiveSegment("diagnostics")}
-            className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "diagnostics" ? "border-emerald-650 text-emerald-650 dark:text-emerald-400 font-bold" : "border-transparent text-slate-405 hover:text-slate-600"}`}
+            className={`pb-3 px-1 border-b-2 transition-all flex items-center gap-2 shrink-0 cursor-pointer ${activeSegment === "diagnostics" ? "border-emerald-650 text-emerald-655 dark:text-emerald-400 font-bold" : "border-transparent text-slate-405 hover:text-slate-600"}`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             Database Health Check
@@ -1796,6 +1967,168 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
             </div>
           )}
 
+          {/* USER MANAGEMENT TAB */}
+          {activeSegment === "users" && (() => {
+            const filteredUsers = users.filter((u) => {
+              const matchesSearch =
+                u.fullName.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                u.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                (u.studentId && u.studentId.toLowerCase().includes(userSearchQuery.toLowerCase()));
+
+              const matchesRole = userFilterRole === "all" ? true : u.role === userFilterRole;
+
+              return matchesSearch && matchesRole;
+            });
+
+            return (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                      <LucideIcon name="Users" className="text-emerald-600 dark:text-emerald-400" /> JSS3 Registered Accounts
+                    </h3>
+                    <p className="text-xs font-bold text-slate-400">Manage student profiles, registration IDs, and educator/teacher privileges</p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setUserFormError("");
+                      setNewUserForm({ fullName: "", email: "", password: "", role: UserRole.STUDENT });
+                      setIsAddUserOpen(true);
+                    }}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <LucideIcon name="UserPlus" size={13} /> Add New Account
+                  </button>
+                </div>
+
+                {/* Filter and search headers */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="md:col-span-3 relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-405">
+                      <LucideIcon name="Search" size={14} />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Search accounts by name, email or Student registration ID..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border text-xs font-semibold outline-none bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-705 transition-all focus:border-indigo-505 shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <select
+                      value={userFilterRole}
+                      onChange={(e) => setUserFilterRole(e.target.value)}
+                      className="w-full px-3 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider outline-none bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-650 transition-all focus:border-indigo-500 shadow-xs"
+                    >
+                      <option value="all">👥 ALL ROLES</option>
+                      <option value="STUDENT">👨‍🎓 STUDENTS ONLY</option>
+                      <option value="ADMIN">👑 EDUCATORS / ADMINS</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Micro Metrics Rows */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className={`p-4 rounded-xl border ${darkMode ? "bg-slate-900/65 border-slate-800" : "bg-white border-slate-200"} text-center`}>
+                    <div className="text-xl font-bold font-mono text-indigo-655 dark:text-indigo-400">{users.length}</div>
+                    <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Total Registered Accounts</div>
+                  </div>
+                  <div className={`p-4 rounded-xl border ${darkMode ? "bg-slate-900/65 border-slate-800" : "bg-white border-slate-200"} text-center`}>
+                    <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-450">
+                      {users.filter(u => u.role === UserRole.STUDENT).length}
+                    </div>
+                    <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">JSS3 Students</div>
+                  </div>
+                  <div className={`p-4 rounded-xl border ${darkMode ? "bg-slate-900/65 border-slate-800" : "bg-white border-slate-200"} text-center`}>
+                    <div className="text-xl font-bold font-mono text-purple-600 dark:text-purple-400">
+                      {users.filter(u => u.role === UserRole.ADMIN).length}
+                    </div>
+                    <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Educators / Teachers</div>
+                  </div>
+                  <div className={`p-4 rounded-xl border ${darkMode ? "bg-slate-900/65 border-slate-800" : "bg-white border-slate-200"} text-center`}>
+                    <div className="text-xl font-bold font-mono text-amber-500">{filteredUsers.length}</div>
+                    <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Active Matched Accounts</div>
+                  </div>
+                </div>
+
+                {filteredUsers.length === 0 ? (
+                  <div className={`text-center py-16 rounded-2xl border-2 border-dashed ${darkMode ? "border-slate-800" : "border-slate-250"}`}>
+                    <LucideIcon name="Users" size={36} className="text-slate-400 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-slate-600 dark:text-slate-350">No registered accounts found</p>
+                    <p className="text-xs text-slate-400 mt-1">Try searching another name, email address or adjust your active role filters.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border-2 border-slate-200 dark:border-slate-800 p-0 rounded-2xl shadow-sm bg-white dark:bg-slate-905">
+                    <table className="w-full text-left text-xs">
+                      <thead className={`text-[10px] uppercase tracking-wider font-semibold ${darkMode ? "bg-slate-900 text-slate-400 border-b border-slate-800" : "bg-slate-50 text-slate-500 border-b border-slate-200"}`}>
+                        <tr>
+                          <th className="p-3.5 border-r dark:border-slate-800">Account Owner Particulars</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Registered Email</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Role Status</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Student ID / Privilege Label</th>
+                          <th className="p-3.5 border-r dark:border-slate-800">Registration Date</th>
+                          <th className="p-3.5 text-center">Action Console</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-150 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
+                        {filteredUsers.map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-100/30 dark:hover:bg-slate-900/10 transition-colors">
+                            <td className="p-3.5">
+                              <div className="font-bold text-slate-950 dark:text-white flex items-center gap-2">
+                                <span className={`w-2.5 h-2.5 rounded-full ${item.role === UserRole.ADMIN ? "bg-purple-500 animate-pulse" : "bg-indigo-500"}`} />
+                                {item.fullName}
+                              </div>
+                            </td>
+                            <td className="p-3.5 font-semibold text-slate-850 dark:text-slate-200">
+                              {item.email}
+                            </td>
+                            <td className="p-3.5">
+                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${item.role === UserRole.ADMIN ? "bg-purple-100 text-purple-750 dark:bg-purple-955/20 dark:text-purple-400" : "bg-indigo-55 text-indigo-650 dark:bg-indigo-955/20 dark:text-indigo-400"}`}>
+                                {item.role === UserRole.ADMIN ? "💼 EDUCATOR / ADMIN" : "👨‍🎓 CANDIDATE / STUDENT"}
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-mono text-[11px] font-bold">
+                              {item.studentId ? (
+                                <span className="text-emerald-600 dark:text-emerald-400">{item.studentId}</span>
+                              ) : (
+                                <span className="text-slate-400 italic font-medium">Network Administrator</span>
+                              )}
+                            </td>
+                            <td className="p-3.5 font-mono text-[10px] text-slate-450 font-semibold">
+                              {item.registrationDate ? new Date(item.registrationDate).toLocaleDateString() : "Pre-activated"} {item.registrationDate ? new Date(item.registrationDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                            </td>
+                            <td className="p-3.5">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setUserFormError("");
+                                    setEditingUser(item);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-indigo-600/10 hover:bg-slate-800/10 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <LucideIcon name="Edit" size={11} /> Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(item)}
+                                  className="px-2 py-1.5 bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-600 dark:text-rose-400 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                                >
+                                  <LucideIcon name="Trash2" size={11} /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {activeSegment === "diagnostics" && (
             <DatabaseHealthCheck user={user} />
           )}
@@ -2070,8 +2403,9 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
             </motion.div>
           </div>
         )}
-        {/* CLOUD SAVING MODAL OVERLAY */}
-        {isCloudSaving && (
+
+      {/* CLOUD SAVING MODAL OVERLAY */}
+      {isCloudSaving && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl border border-slate-200/80 dark:border-slate-800 text-center flex flex-col items-center max-w-xs space-y-4 animate-duration-150">
               <div className="relative">
@@ -2081,10 +2415,177 @@ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
                 </div>
               </div>
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-950 dark:text-white">Central Sync Active</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-955 dark:text-white">Central Sync Active</h4>
                 <p className="text-[11px] text-slate-400 dark:text-slate-400 mt-1 leading-relaxed leading-normal">{cloudSaveMessage || "Updating central CBT cloud store..."}</p>
               </div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ADD ACCOUNT / USER MODAL */}
+      <AnimatePresence>
+        {isAddUserOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`w-full max-w-sm p-6 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto`}
+            >
+              <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100 dark:border-slate-800">
+                <h3 className="font-black text-xs uppercase tracking-wider text-blue-600">Add Registered Account Profile</h3>
+                <button onClick={() => setIsAddUserOpen(false)}>
+                  <LucideIcon name="X" size={18} />
+                </button>
+              </div>
+
+              {userFormError && (
+                <div className="p-3 border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold rounded-xl flex items-center gap-2">
+                  <LucideIcon name="AlertTriangle" size={15} /> <span>{userFormError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleAddUserSubmit} className="space-y-4 text-xs font-bold">
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Account Role</label>
+                  <select
+                    value={newUserForm.role}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as UserRole })}
+                    className="w-full px-3 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-800 outline-none font-black uppercase text-[11px] tracking-wider"
+                  >
+                    <option value={UserRole.STUDENT}>👨‍🎓 STUDENT / CANDIDATE</option>
+                    <option value={UserRole.ADMIN}>👑 TEACHER / EDUCATOR</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g., Jane Doe"
+                    value={newUserForm.fullName}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, fullName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-800 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g., user@faith.edu"
+                    value={newUserForm.email}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-805 outline-none text-[11px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Password</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Set custom password..."
+                    value={newUserForm.password}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-805 outline-none text-[11px]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer"
+                >
+                  Create Account Profile
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EDIT ACCOUNT / USER MODAL */}
+      <AnimatePresence>
+        {editingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`w-full max-w-sm p-6 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto`}
+            >
+              <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100 dark:border-slate-800">
+                <h3 className="font-black text-xs uppercase tracking-wider text-blue-600">Update Profile Details</h3>
+                <button onClick={() => setEditingUser(null)}>
+                  <LucideIcon name="X" size={18} />
+                </button>
+              </div>
+
+              {userFormError && (
+                <div className="p-3 border border-red-500/20 bg-red-500/10 text-red-500 text-xs font-semibold rounded-xl flex items-center gap-2">
+                  <LucideIcon name="AlertTriangle" size={15} /> <span>{userFormError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleEditUserSubmit} className="space-y-4 text-xs font-bold">
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Account Role</label>
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                    className="w-full px-3 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-800 outline-none font-black uppercase text-[11px] tracking-wider"
+                  >
+                    <option value={UserRole.STUDENT}>👨‍🎓 STUDENT / CANDIDATE</option>
+                    <option value={UserRole.ADMIN}>👑 TEACHER / EDUCATOR</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingUser.fullName}
+                    onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-805 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={editingUser.email}
+                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-805 outline-none text-[11px]"
+                  />
+                </div>
+
+                {editingUser.role === UserRole.STUDENT && (
+                  <div>
+                    <label className="block text-[10px] uppercase font-black text-slate-400 mb-1.5 font-bold">Registration Student ID</label>
+                    <input
+                      type="text"
+                      value={editingUser.studentId || ""}
+                      onChange={(e) => setEditingUser({ ...editingUser, studentId: e.target.value })}
+                      placeholder="Auto-assigned unless specified..."
+                      className="w-full px-3.5 py-2.5 border-2 rounded-xl bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-805 outline-none text-[11px]"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer"
+                >
+                  Save Profile Updates
+                </button>
+              </form>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

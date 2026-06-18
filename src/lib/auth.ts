@@ -91,21 +91,29 @@ export function loginUser(email: string, pass: string): User | null {
   return null;
 }
 
-export function registerStudent(fullName: string, email: string, pass: string): User {
+export function registerUser(fullName: string, email: string, pass: string, role: UserRole): User {
   const users = getUsersFromDB();
   const passwords = JSON.parse(localStorage.getItem("FF_CBT_PASSWORDS") || "{}");
   
   const formattedEmail = email.toLowerCase().trim();
-  const studentNum = users.filter(u => u.role === UserRole.STUDENT).length + 101;
-  const studentId = `FF/JSS3/${studentNum}`;
+  
+  if (users.some(u => u.email.toLowerCase() === formattedEmail)) {
+    throw new Error("This email is already registered inside CBT Database!");
+  }
+
+  let studentId: string | undefined;
+  if (role === UserRole.STUDENT) {
+    const studentNum = users.filter(u => u.role === UserRole.STUDENT).length + 101;
+    studentId = `FF/JSS3/${studentNum}`;
+  }
   
   const newUser: User = {
-    id: `stud_${Date.now()}`,
+    id: role === UserRole.ADMIN ? `admin_${Date.now()}` : `stud_${Date.now()}`,
     email: formattedEmail,
     fullName: fullName.trim(),
-    role: UserRole.STUDENT,
+    role,
     registrationDate: new Date().toISOString(),
-    studentId
+    ...(studentId ? { studentId } : {})
   };
   
   users.push(newUser);
@@ -113,13 +121,18 @@ export function registerStudent(fullName: string, email: string, pass: string): 
   
   localStorage.setItem("FF_CBT_USERS", JSON.stringify(users));
   localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify(passwords));
-  localStorage.setItem("FF_CBT_CURRENT_USER", JSON.stringify(newUser));
   
   pushCollectionToServer("users", users);
   pushCollectionToServer("passwords", passwords);
   
-  logActivity(newUser.id, newUser.fullName, newUser.role, "Register", `New student successfully registered with ID: ${studentId}`);
+  logActivity(newUser.id, newUser.fullName, newUser.role, "Register", `New ${role === UserRole.ADMIN ? "educator" : "student"} successfully registered ${studentId ? "with ID: " + studentId : ""}`);
   
+  return newUser;
+}
+
+export function registerStudent(fullName: string, email: string, pass: string): User {
+  const newUser = registerUser(fullName, email, pass, UserRole.STUDENT);
+  localStorage.setItem("FF_CBT_CURRENT_USER", JSON.stringify(newUser));
   return newUser;
 }
 

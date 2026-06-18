@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { User, UserRole, ExamConfig, Result, Question } from "./types";
-import { getCurrentUser, loginUser, registerStudent, logoutUser, getUsersFromDB } from "./lib/auth";
+import { getCurrentUser, loginUser, registerStudent, registerUser, logoutUser, getUsersFromDB } from "./lib/auth";
 import { getQuestionsFromDB } from "./data/questionDatabase";
 import { saveResult, getGrade } from "./lib/results";
 import { SUBJECTS } from "./data/subjectData";
@@ -162,9 +162,10 @@ export default function App() {
         return;
       }
       try {
-        const registered = registerStudent(fullName, email, password);
+        const registered = registerUser(fullName, email, password, authRole);
+        localStorage.setItem("FF_CBT_CURRENT_USER", JSON.stringify(registered));
         setCurrentUser(registered);
-        setView("STUDENT_DASHBOARD");
+        setView(registered.role === UserRole.ADMIN ? "ADMIN_DASHBOARD" : "STUDENT_DASHBOARD");
       } catch (err: any) {
         setAuthError(err.message || "Failed to complete registration.");
       }
@@ -332,7 +333,7 @@ export default function App() {
                   referrerPolicy="no-referrer"
                 />
                 <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
-                  {authMode === "login" ? `${authRole === UserRole.ADMIN ? "Educator" : "Student"} Login` : "Student Registration"}
+                  {authMode === "login" ? `${authRole === UserRole.ADMIN ? "Educator" : "Student"} Login` : `${authRole === UserRole.ADMIN ? "Educator" : "Student"} Registration`}
                 </h2>
                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 font-mono">
                   FAITH FOUNDATION CBT Portal
@@ -367,7 +368,7 @@ export default function App() {
 
                 {authMode === "register" && (
                   <div>
-                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5">Your Full Name (Candidate)</label>
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5">Your Full Name ({authRole === UserRole.ADMIN ? "Educator" : "Candidate"})</label>
                     <input
                       type="text"
                       required
@@ -408,31 +409,25 @@ export default function App() {
                   className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all cursor-pointer animate-duration-150"
                   id="auth-submit-btn"
                 >
-                  {authMode === "login" ? "Verify Credentials & Sign In" : "Register Candidate Account"}
+                  {authMode === "login" ? "Verify Credentials & Sign In" : `Register ${authRole === UserRole.ADMIN ? "Educator" : "Candidate"} Account`}
                 </button>
               </form>
 
               {/* Toggles */}
               <div className="text-center text-xs border-t border-slate-100 dark:border-slate-800/60 pt-4">
-                {authRole === UserRole.STUDENT ? (
-                  authMode === "login" ? (
-                    <p className="text-slate-400 font-medium text-xs">
-                      New candidate to this portal?{" "}
-                      <button onClick={() => setAuthMode("register")} className="text-indigo-650 dark:text-indigo-400 font-bold uppercase tracking-wide hover:underline cursor-pointer">
-                        Create Account
-                      </button>
-                    </p>
-                  ) : (
-                    <p className="text-slate-400 font-medium text-xs">
-                      Already registered your name?{" "}
-                      <button onClick={() => setAuthMode("login")} className="text-indigo-650 dark:text-indigo-400 font-bold uppercase tracking-wide hover:underline cursor-pointer">
-                        Login directly
-                      </button>
-                    </p>
-                  )
+                {authMode === "login" ? (
+                  <p className="text-slate-400 font-medium text-xs">
+                    New {authRole === UserRole.ADMIN ? "educator" : "candidate"} to this portal?{" "}
+                    <button onClick={() => setAuthMode("register")} className="text-indigo-650 dark:text-indigo-400 font-bold uppercase tracking-wide hover:underline cursor-pointer">
+                      Create Account
+                    </button>
+                  </p>
                 ) : (
-                  <p className="text-slate-400 font-medium uppercase tracking-wider text-[10px] font-mono">
-                    Educators must use official network privileges.
+                  <p className="text-slate-400 font-medium text-xs">
+                    Already registered your name?{" "}
+                    <button onClick={() => setAuthMode("login")} className="text-indigo-650 dark:text-indigo-400 font-bold uppercase tracking-wide hover:underline cursor-pointer">
+                      Login directly
+                    </button>
                   </p>
                 )}
               </div>
