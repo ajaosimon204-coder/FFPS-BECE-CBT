@@ -4,6 +4,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./src/supabaseConfig";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), "cbt_server_db.json");
@@ -270,6 +271,222 @@ async function startServer() {
       res.json({ success: true, savedToLocalOnly: !supabase, version: dbChangeCounter });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // API Endpoint to review and auto-correct uploaded/custom questions using Gemini
+  app.post("/api/db/ai-correct-questions", async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
+        return res.status(400).json({ error: "Gemini API Key is not configured in Server environment variables. Please add GEMINI_API_KEY under the Settings > Secrets tab." });
+      }
+
+      // Initialize official @google/genai client
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+
+      // 1. Fetch current questions
+      let currentDb = loadServerDb();
+      let questions: any[] = [];
+
+      if (supabase) {
+        const { data, error } = await supabase.from("cbt_sync_store").select("*").eq("key", "questions");
+        if (!error && data && data.length > 0) {
+          questions = data[0].data || [];
+        } else {
+          questions = currentDb.questions || [];
+        }
+      } else {
+        questions = currentDb.questions || [];
+      }
+
+      if (!questions || questions.length === 0) {
+        return res.status(400).json({ error: "The central question database appears empty. Please seed or upload subjects first!" });
+      }
+
+      // Filter questions that are custom uploaded or manual additions
+      const uploadedQuestions = questions.filter(q => q.isUploaded === true);
+
+      if (uploadedQuestions.length === 0) {
+        return res.json({
+          success: true,
+          message: "No custom uploaded questions were found. All questions belong to the core database.",
+          analyzedCount: 0,
+          correctionsCount: 0,
+          corrections: []
+        });
+      }
+
+      console.log(`[AI Auto-Correct] Beginning audit on ${uploadedQuestions.length} custom-uploaded questions...`);
+
+      // Batch size of 15 questions to ensure extreme precision and stay well within rate limits
+      const BATCH_SIZE = 15;
+      const correctionsMade: { id: string, oldAnswer: string, newAnswer: string, explanation: string, questionText: string }[] = [];
+      const updatedQuestionsMap = new Map<string, any>();
+
+      for (let i = 0; i < uploadedQuestions.length; i += BATCH_SIZE) {
+        const batch = uploadedQuestions.slice(i, i + BATCH_SIZE);
+        const formattedBatch = batch.map(q => ({
+          id: q.id,
+          questionText: q.questionText,
+          options: q.options || [],
+          currentAnswer: q.correctAnswer
+        }));
+
+        const prompt = `Review the following multiple-choice JSS3 Junior Secondary School exam questions.
+Your task is to analyze each question's text and its list of options, and determine the single academically and factually correct answer option.
+You MUST choose the correct answer exactly as it is written in the options array.
+
+Questions to analyze:
+${JSON.stringify(formattedBatch, null, 2)}`;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+          config: {
+            systemInstruction: "You are an expert junior secondary curriculum board examiner and academic checker for JSS3 / BECE exams in Nigeria. Your job is to select the exact correct matching option from the options provided for each question, and explain correct reasoning.",
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                corrections: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      correctAnswer: { type: Type.STRING, description: "The exact matching text of the correct option. It MUST match one of the items in the options array exactly." },
+                      explanation: { type: Type.STRING, description: "A brief academic explanation (1-2 sentences) of why this is the correct answer." }
+                    },
+                    required: ["id", "correctAnswer", "explanation"]
+                  }
+                }
+              },
+              required: ["corrections"]
+            }
+          }
+        });
+
+        const textOutput = response.text;
+        if (!textOutput) {
+          console.warn(`[AI Auto-Correct] Empty response from Gemini for batch starting at index ${i}`);
+          continue;
+        }
+
+        try {
+          const parsed = JSON.parse(textOutput.trim());
+          const batchCorrections = parsed.corrections || [];
+
+          for (const correction of batchCorrections) {
+            const originalQuestion = batch.find(bq => bq.id === correction.id);
+            if (!originalQuestion) continue;
+
+            const originalOptions = originalQuestion.options || [];
+            let chosenAnswer = (correction.correctAnswer || "").trim();
+
+            if (originalOptions.length === 0) continue;
+
+            // Highly resilient matching with options array
+            let matchedOption = originalOptions.find((opt: string) => opt.trim().toLowerCase() === chosenAnswer.toLowerCase());
+            
+            // If direct match failed, try matching with index (e.g., if the model returned option index/prefix label "A.", "B.", "C.", etc.)
+            if (!matchedOption) {
+              const cleanedCorrection = chosenAnswer.toLowerCase().replace(/[.)\s]+/g, "");
+              if (cleanedCorrection === "a" || cleanedCorrection === "optiona" || cleanedCorrection === "1") {
+                matchedOption = originalOptions[0];
+              } else if (cleanedCorrection === "b" || cleanedCorrection === "optionb" || cleanedCorrection === "2") {
+                matchedOption = originalOptions[1];
+              } else if (cleanedCorrection === "c" || cleanedCorrection === "optionc" || cleanedCorrection === "3") {
+                matchedOption = originalOptions[2];
+              } else if (cleanedCorrection === "d" || cleanedCorrection === "optiond" || cleanedCorrection === "4") {
+                matchedOption = originalOptions[3];
+              }
+            }
+
+            // Word-subset matching fallback
+            if (!matchedOption) {
+              matchedOption = originalOptions.find((opt: string) => 
+                opt.toLowerCase().includes(chosenAnswer.toLowerCase()) || 
+                chosenAnswer.toLowerCase().includes(opt.toLowerCase())
+              );
+            }
+
+            // Fallback: Default to first option if empty or original current answer to safeguard
+            if (!matchedOption) {
+              matchedOption = originalQuestion.correctAnswer || originalOptions[0];
+            }
+
+            const cleanMatchedOption = matchedOption.trim();
+            const cleanOriginalAnswer = (originalQuestion.correctAnswer || "").trim();
+
+            const isDifferent = cleanMatchedOption.toLowerCase() !== cleanOriginalAnswer.toLowerCase();
+            if (isDifferent) {
+              correctionsMade.push({
+                id: originalQuestion.id,
+                oldAnswer: originalQuestion.correctAnswer,
+                newAnswer: cleanMatchedOption,
+                explanation: correction.explanation || originalQuestion.explanation,
+                questionText: originalQuestion.questionText
+              });
+            }
+
+            updatedQuestionsMap.set(originalQuestion.id, {
+              ...originalQuestion,
+              correctAnswer: cleanMatchedOption,
+              explanation: correction.explanation || originalQuestion.explanation || "Verified JSS3 CBT correct answer."
+            });
+          }
+        } catch (parseError) {
+          console.error(`[AI Auto-Correct] JSON parsing failed for batch starting at index ${i}`, parseError, textOutput);
+        }
+      }
+
+      // 2. Map final updated questions array
+      const finalQuestionsList = questions.map(q => {
+        if (updatedQuestionsMap.has(q.id)) {
+          return updatedQuestionsMap.get(q.id);
+        }
+        return q;
+      });
+
+      // 3. Write updates back to local file
+      currentDb.questions = finalQuestionsList;
+      saveServerDb(currentDb);
+
+      // 4. Mirror write to cloud Supabase if connected
+      if (supabase) {
+        const { error } = await supabase.from("cbt_sync_store").upsert({
+          key: "questions",
+          data: finalQuestionsList,
+          updated_at: new Date().toISOString()
+        });
+        if (error) {
+          console.error("[AI Auto-Correct] Failed pushing corrected array to Supabase:", error.message);
+        }
+      }
+
+      dbChangeCounter++;
+      console.log(`[AI Auto-Correct] Completed. Reviewed ${uploadedQuestions.length}, corrected ${correctionsMade.length} items.`);
+
+      res.json({
+        success: true,
+        message: `Successfully analyzed ${uploadedQuestions.length} custom questions and corrected ${correctionsMade.length} wrong answers!`,
+        analyzedCount: uploadedQuestions.length,
+        correctionsCount: correctionsMade.length,
+        corrections: correctionsMade,
+        version: dbChangeCounter
+      });
+
+    } catch (e: any) {
+      console.error("[AI Auto-Correct] Exception in API Handler:", e);
+      res.status(500).json({ error: e.message || "An error occurred during verification." });
     }
   });
 

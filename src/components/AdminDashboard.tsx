@@ -13,7 +13,7 @@ import {
 } from "../data/questionDatabase";
 import { getResultsFromDB, saveResultsToDB } from "../lib/results";
 import DatabaseHealthCheck from "./DatabaseHealthCheck";
-import { pushCollectionToServer } from "../lib/sync";
+import { pushCollectionToServer, syncWithServer } from "../lib/sync";
 import LucideIcon from "./LucideIcon";
 import schoolLogo from "../assets/images/school_logo_1781627574517.jpg";
 import {
@@ -76,6 +76,55 @@ export default function AdminDashboard({
   // Edit / Add MODALS
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+
+  // AI Answer Assistant & Auto-Correction states
+  const [aiHealingStatus, setAiHealingStatus] = useState<"idle" | "running" | "success" | "error">("idle");
+  const [aiHealingResults, setAiHealingResults] = useState<{
+    message: string;
+    analyzedCount: number;
+    correctionsCount: number;
+    corrections: Array<{ id: string; questionText: string; oldAnswer: string; newAnswer: string; explanation: string }>;
+  } | null>(null);
+  const [aiHealingError, setAiHealingError] = useState<string | null>(null);
+
+  const handleAiCorrectQuestions = async () => {
+    if (confirm("This will analyze all custom-uploaded JSS3 questions with Google Gemini and automatically correct incorrect answer choices. This takes about 10-30s. Continue?")) {
+      setAiHealingStatus("running");
+      setAiHealingError(null);
+      setAiHealingResults(null);
+      try {
+        const response = await fetch("/api/db/ai-correct-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${response.status}: Failed to reach correction server.`);
+        }
+        
+        const data = await response.json();
+        setAiHealingResults(data);
+        setAiHealingStatus("success");
+        
+        // Log to activity feeds
+        logActivity(
+          "system",
+          "System Database Manager",
+          UserRole.ADMIN,
+          "AI Question Healing Completed",
+          `Analyzed ${data.analyzedCount} uploads, corrected ${data.correctionsCount} answers using Gemini.`
+        );
+
+        // Download and reload database states
+        await syncWithServer();
+      } catch (err: any) {
+        console.error("AI Healing error:", err);
+        setAiHealingError(err.message || "An unexpected error occurred during correction.");
+        setAiHealingStatus("error");
+      }
+    }
+  };
   const [newQForm, setNewQForm] = useState({
     subjectId: "maths",
     questionText: "",
@@ -1445,132 +1494,252 @@ ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;`);
 
               {/* DUAL SCREEN BULK LOADER & LIST SPLIT */}
               <div className="grid lg:grid-cols-3 gap-6">
-                {/* Pasted CSV Bulk Uploader */}
-                <div className={`p-6 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} lg:col-span-1 space-y-4 self-start shadow-sm`}>
-                  <div className="flex border-b border-slate-200 dark:border-slate-800 pb-2 text-[11px] font-black uppercase tracking-wider gap-3">
-                    <button
-                      onClick={() => setActiveImportTab("file")}
-                      className={`pb-2 px-1 border-b-2 transition-all flex items-center gap-1 cursor-pointer ${activeImportTab === "file" ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-400"}`}
-                    >
-                      <LucideIcon name="Upload" size={11} /> File (Excel/CSV)
-                    </button>
-                    <button
-                      onClick={() => setActiveImportTab("paste")}
-                      className={`pb-2 px-1 border-b-2 transition-all flex items-center gap-1 cursor-pointer ${activeImportTab === "paste" ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-400"}`}
-                    >
-                      <LucideIcon name="FileText" size={11} /> Paste CSV Text
-                    </button>
-                  </div>
-
-                  {/* Subject Override Assignment (Upload for specific subjects one after another) */}
-                  <div className="bg-slate-100/40 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/80 space-y-1.5 shadow-xs">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
-                      <LucideIcon name="Settings" size={10} /> Target JSS3 Subject Destination
-                    </label>
-                    <select
-                      value={importSubjectOverride}
-                      onChange={(e) => setImportSubjectOverride(e.target.value)}
-                      className="w-full px-2.5 py-2.5 rounded-lg border text-xs font-black uppercase tracking-wider outline-none bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 transition-all focus:border-blue-500"
-                    >
-                      <option value="auto">🔍 Auto-detect from "Subject" column</option>
-                      {SUBJECTS.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          🎯 {s.name}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
-                      Select a specific subject to upload custom questions for <strong>one after the other</strong>, or let the engine auto-detect.
-                    </p>
-                  </div>
-
-                  {activeImportTab === "file" ? (
-                    <div className="space-y-4">
-                      <p className="text-[11px] text-slate-400 leading-normal font-bold">
-                        Upload standard spreadsheet formats <span className="font-mono text-[9px] bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-extrabold uppercase">.xlsx</span>, <span className="font-mono text-[9px] bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-extrabold uppercase">.xls</span>, or <span className="font-mono text-[9px] bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-extrabold uppercase">.csv</span> containing: <span className="underline">Subject</span>, <span className="underline">Question</span>, <span className="underline">Option A</span>, <span className="underline">Option B</span>, <span className="underline">Correct Answer</span>.
-                      </p>
-
-                      {/* DRAG AND DROP ZONE */}
-                      <div
-                        onDragEnter={handleDrag}
-                        onDragOver={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDrop={handleDrop}
-                        className={`border-2 border-dashed rounded-xl p-5 text-center flex flex-col items-center justify-center transition-all cursor-pointer relative ${
-                          dragActive
-                            ? "border-blue-500 bg-blue-500/5"
-                            : darkMode
-                            ? "border-slate-800 hover:border-slate-705 bg-slate-955/30"
-                            : "border-slate-200 hover:border-blue-300 bg-slate-50"
-                        }`}
-                      >
-                        <input
-                          type="file"
-                          id="excel-file-upload-input"
-                          className="hidden"
-                          accept=".xlsx,.xls,.csv"
-                          onChange={handleFileSelect}
-                        />
-                        <label htmlFor="excel-file-upload-input" className="cursor-pointer w-full h-full flex flex-col items-center justify-center py-4 space-y-2">
-                          <div className={`p-2.5 rounded-lg ${darkMode ? "bg-slate-900 border border-slate-800" : "bg-white border border-slate-200"} flex items-center justify-center text-blue-600`}>
-                            <LucideIcon name="Upload" size={20} />
-                          </div>
-                          <div>
-                            <span className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">Choose Spreadsheet File</span>
-                            <span className="block text-[10px] text-slate-400 font-black uppercase mt-1">or drag & drop here</span>
-                          </div>
-                        </label>
-                      </div>
-
-                      {fileImportError && (
-                        <div className="p-3 border-2 border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-black rounded-xl uppercase tracking-wider">
-                          {fileImportError}
-                        </div>
-                      )}
-
-                      {fileImportSuccess && (
-                        <div className="p-3 border-2 border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-black rounded-xl uppercase tracking-wider">
-                          {fileImportSuccess}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-450 uppercase tracking-wider">
-                        <span>raw excel csv text payload</span>
-                        <button
-                          onClick={() => {
-                            const csvDemo = `Subject,Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Difficulty,Topic
-maths,"Solve for x: x/2 - 4 = 10",28,14,24,30,28,Multiply by 2 yields base computations.,Medium,Fractions
-english,Find antonym of DEPARTure,arrival,flight,ticket,journey,arrival,Departure means leaving. The opposite is arrival.,Easy,Antonyms`;
-                            setCsvText(csvDemo);
-                          }}
-                          className="text-[9px] text-blue-650 dark:text-blue-400 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
-                        >
-                          Paste Demo Matrix
-                        </button>
-                      </div>
-
-                      <textarea
-                        rows={8}
-                        placeholder={`Subject,Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Difficulty,Topic
-maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
-                        value={csvText}
-                        onChange={(e) => setCsvText(e.target.value)}
-                        className="w-full p-3 text-xs outline-none focus:border-blue-600 border-2 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-mono text-slate-700 dark:text-slate-300 font-bold"
-                      />
-
-                      {bulkError && <div className="p-3.5 border-2 border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-black rounded-xl uppercase tracking-wide">{bulkError}</div>}
-                      {bulkSuccess && <div className="p-3.5 border-2 border-emerald-505/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-black rounded-xl uppercase tracking-wide">{bulkSuccess}</div>}
-
+                <div className="lg:col-span-1 space-y-6 self-start">
+                  {/* Pasted CSV Bulk Uploader */}
+                  <div className={`p-6 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} space-y-4 shadow-sm`}>
+                    <div className="flex border-b border-slate-200 dark:border-slate-800 pb-2 text-[11px] font-black uppercase tracking-wider gap-3">
                       <button
-                        onClick={handleCsvImport}
-                        className="w-full py-3 bg-blue-900 dark:bg-blue-600 hover:bg-blue-800 dark:hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer"
+                        onClick={() => setActiveImportTab("file")}
+                        className={`pb-2 px-1 border-b-2 transition-all flex items-center gap-1 cursor-pointer ${activeImportTab === "file" ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-400"}`}
                       >
-                        Process Paste Matrix payload
+                        <LucideIcon name="Upload" size={11} /> File (Excel/CSV)
+                      </button>
+                      <button
+                        onClick={() => setActiveImportTab("paste")}
+                        className={`pb-2 px-1 border-b-2 transition-all flex items-center gap-1 cursor-pointer ${activeImportTab === "paste" ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-400"}`}
+                      >
+                        <LucideIcon name="FileText" size={11} /> Paste CSV Text
                       </button>
                     </div>
-                  )}
+
+                    {/* Subject Override Assignment (Upload for specific subjects one after another) */}
+                    <div className="bg-slate-100/40 dark:bg-slate-950/20 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/80 space-y-1.5 shadow-xs">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                        <LucideIcon name="Settings" size={10} /> Target JSS3 Subject Destination
+                      </label>
+                      <select
+                        value={importSubjectOverride}
+                        onChange={(e) => setImportSubjectOverride(e.target.value)}
+                        className="w-full px-2.5 py-2.5 rounded-lg border text-xs font-black uppercase tracking-wider outline-none bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 transition-all focus:border-blue-500"
+                      >
+                        <option value="auto">🔍 Auto-detect from "Subject" column</option>
+                        {SUBJECTS.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            🎯 {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
+                        Select a specific subject to upload custom questions for <strong>one after the other</strong>, or let the engine auto-detect.
+                      </p>
+                    </div>
+
+                    {activeImportTab === "file" ? (
+                      <div className="space-y-4">
+                        <p className="text-[11px] text-slate-400 leading-normal font-bold">
+                          Upload standard spreadsheet formats <span className="font-mono text-[9px] bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-extrabold uppercase">.xlsx</span>, <span className="font-mono text-[9px] bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-extrabold uppercase">.xls</span>, or <span className="font-mono text-[9px] bg-slate-100 dark:bg-slate-950 px-1 py-0.5 rounded text-blue-600 font-extrabold uppercase">.csv</span> containing: <span className="underline">Subject</span>, <span className="underline">Question</span>, <span className="underline">Option A</span>, <span className="underline">Option B</span>, <span className="underline">Correct Answer</span>.
+                        </p>
+
+                        {/* DRAG AND DROP ZONE */}
+                        <div
+                          onDragEnter={handleDrag}
+                          onDragOver={handleDrag}
+                          onDragLeave={handleDrag}
+                          onDrop={handleDrop}
+                          className={`border-2 border-dashed rounded-xl p-5 text-center flex flex-col items-center justify-center transition-all cursor-pointer relative ${
+                            dragActive
+                              ? "border-blue-500 bg-blue-500/5"
+                              : darkMode
+                              ? "border-slate-800 hover:border-slate-705 bg-slate-955/30"
+                              : "border-slate-200 hover:border-blue-300 bg-slate-50"
+                          }`}
+                        >
+                          <input
+                            type="file"
+                            id="excel-file-upload-input"
+                            className="hidden"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleFileSelect}
+                          />
+                          <label htmlFor="excel-file-upload-input" className="cursor-pointer w-full h-full flex flex-col items-center justify-center py-4 space-y-2">
+                            <div className={`p-2.5 rounded-lg ${darkMode ? "bg-slate-900 border border-slate-800" : "bg-white border border-slate-200"} flex items-center justify-center text-blue-600`}>
+                              <LucideIcon name="Upload" size={20} />
+                            </div>
+                            <div>
+                              <span className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">Choose Spreadsheet File</span>
+                              <span className="block text-[10px] text-slate-400 font-black uppercase mt-1">or drag & drop here</span>
+                            </div>
+                          </label>
+                        </div>
+
+                        {fileImportError && (
+                          <div className="p-3 border-2 border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-black rounded-xl uppercase tracking-wider">
+                            {fileImportError}
+                          </div>
+                        )}
+
+                        {fileImportSuccess && (
+                          <div className="p-3 border-2 border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-black rounded-xl uppercase tracking-wider">
+                            {fileImportSuccess}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-450 uppercase tracking-wider">
+                          <span>raw excel csv text payload</span>
+                          <button
+                            onClick={() => {
+                              const csvDemo = `Subject,Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Difficulty,Topic
+ maths,"Solve for x: x/2 - 4 = 10",28,14,24,30,28,Multiply by 2 yields base computations.,Medium,Fractions
+ english,Find antonym of DEPARTure,arrival,flight,ticket,journey,arrival,Departure means leaving. The opposite is arrival.,Easy,Antonyms`;
+                              setCsvText(csvDemo);
+                            }}
+                            className="text-[9px] text-blue-655 dark:text-blue-400 font-extrabold uppercase tracking-wider hover:underline cursor-pointer"
+                          >
+                            Paste Demo Matrix
+                          </button>
+                        </div>
+
+                        <textarea
+                          rows={8}
+                          placeholder={`Subject,Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Difficulty,Topic
+ maths,Solve for y: 2y = 10,5,10,2,4,5,Divide by 2 yields 5,Easy,Algebra`}
+                          value={csvText}
+                          onChange={(e) => setCsvText(e.target.value)}
+                          className="w-full p-3 text-xs outline-none focus:border-blue-600 border-2 rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-mono text-slate-700 dark:text-slate-300 font-bold"
+                        />
+
+                        {bulkError && <div className="p-3.5 border-2 border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-black rounded-xl uppercase tracking-wide">{bulkError}</div>}
+                        {bulkSuccess && <div className="p-3.5 border-2 border-emerald-555/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-black rounded-xl uppercase tracking-wide">{bulkSuccess}</div>}
+
+                        <button
+                          onClick={handleCsvImport}
+                          className="w-full py-3 bg-blue-900 dark:bg-blue-600 hover:bg-blue-800 dark:hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer"
+                        >
+                          Process Paste Matrix payload
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* AI Answer Assistant & Auto-Correction Center */}
+                  <div className={`p-6 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} space-y-4 shadow-sm`}>
+                    <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-3">
+                      <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                        <LucideIcon name="Sparkles" size={16} className={aiHealingStatus === "running" ? "animate-spin" : ""} />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">AI Answer Assistant</h3>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Powered by Gemini 3.5 Flash</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <p className="text-slate-500 dark:text-slate-450 leading-normal font-medium text-[11px]">
+                        Spreadsheet uploads often contain mistakes, incorrect options, or mismatched labels. This tool scans your entire custom question repository and corrects them using Gemini AI.
+                      </p>
+
+                      <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-805/85 space-y-1.5 shadow-2xs">
+                        <div className="flex justify-between items-center text-[10px] uppercase font-black tracking-wider text-slate-400">
+                          <span>Uploaded JSS3 Questions:</span>
+                          <span className="bg-blue-50 text-blue-650 dark:bg-blue-950/50 dark:text-blue-400 px-2 py-0.5 rounded font-black text-[10px]">
+                            {questions.filter(q => q.isUploaded).length} Items
+                          </span>
+                        </div>
+                      </div>
+
+                      {aiHealingStatus === "idle" && (
+                        <button
+                          onClick={handleAiCorrectQuestions}
+                          disabled={questions.filter(q => q.isUploaded).length === 0}
+                          className={`w-full py-3 text-xs font-black uppercase tracking-wider shadow-lg rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            questions.filter(q => q.isUploaded).length === 0
+                              ? "bg-slate-100 dark:bg-slate-950 text-slate-400 border border-slate-200/50 dark:border-slate-800 cursor-not-allowed shadow-none"
+                              : "bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-550 text-white"
+                          }`}
+                        >
+                          <LucideIcon name="Sparkles" size={13} /> Review & Correct Uploads
+                        </button>
+                      )}
+
+                      {aiHealingStatus === "running" && (
+                        <div className="space-y-2 p-3 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl border border-indigo-200/50 dark:border-indigo-900/50 text-indigo-700 dark:text-indigo-400 font-bold text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping"></span>
+                            <span className="text-[11px] uppercase tracking-wider">AI Auditing uploads...</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-normal normal-case font-medium">
+                            Analyzing curriculum content scientifically and replacing incorrect answers. Please wait (10-30 seconds).
+                          </p>
+                        </div>
+                      )}
+
+                      {aiHealingStatus === "error" && (
+                        <div className="space-y-2">
+                          <div className="p-3 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-200/50 dark:border-rose-900/50 text-rose-600 dark:text-rose-450 text-[11px] font-bold">
+                            <span className="uppercase tracking-wider font-extrabold block mb-1"> Correction Failed</span>
+                            {aiHealingError}
+                          </div>
+                          <button
+                            onClick={handleAiCorrectQuestions}
+                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer shadow-md"
+                          >
+                            Retry correction run
+                          </button>
+                        </div>
+                      )}
+
+                      {aiHealingStatus === "success" && aiHealingResults && (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/10 rounded-xl border border-emerald-100 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-400 space-y-1">
+                            <div className="text-[11px] font-black uppercase tracking-wider flex items-center gap-1">
+                              <LucideIcon name="CheckCircle" size={12} className="text-emerald-600" /> Audit Complete!
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[10px] uppercase font-bold text-slate-500 pt-2 border-t border-emerald-200/40 dark:border-emerald-900/20">
+                              <div>Reviewed: <span className="font-black text-slate-700 dark:text-slate-350">{aiHealingResults.analyzedCount}</span></div>
+                              <div>Corrections: <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{aiHealingResults.correctionsCount}</span></div>
+                            </div>
+                          </div>
+
+                          {aiHealingResults.correctionsCount > 0 ? (
+                            <div className="space-y-2">
+                              <div className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Corrections report:</div>
+                              <div className="max-h-[180px] overflow-y-auto space-y-2 border border-slate-150 dark:border-slate-800 rounded-xl p-2 bg-slate-50/50 dark:bg-slate-950/50 shadow-inner pr-1">
+                                {aiHealingResults.corrections.map((corr, cIdx) => (
+                                  <div key={cIdx} className="p-2 border border-slate-200/60 dark:border-slate-800/65 rounded-lg bg-white dark:bg-slate-950 space-y-1 text-[11px]">
+                                    <div className="font-bold text-slate-600 dark:text-slate-300 leading-normal line-clamp-2">
+                                      "{corr.questionText}"
+                                    </div>
+                                    <div className="flex flex-col text-[10px] gap-0.5 font-bold uppercase tracking-wider pt-1 border-t border-slate-100 dark:border-slate-900">
+                                      <div className="text-rose-500 line-through">Old Answer: {corr.oldAnswer}</div>
+                                      <div className="text-emerald-600">Corrected: {corr.newAnswer}</div>
+                                    </div>
+                                    {corr.explanation && (
+                                      <p className="text-[9px] text-slate-400 italic font-medium leading-relaxed mt-0.5">
+                                        💡 {corr.explanation}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-150 dark:border-slate-800 rounded-xl text-center text-slate-400 font-bold uppercase text-[9px] tracking-wider leading-relaxed">
+                              ✅ Outstanding performance! All uploaded questions matched scientifically correct answers.
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => setAiHealingStatus("idle")}
+                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-955 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                          >
+                            Dismiss Report
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Question Banks lists scroll screen */}
