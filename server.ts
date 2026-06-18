@@ -275,7 +275,7 @@ async function startServer() {
   });
 
   // API Endpoint to review and auto-correct uploaded/custom questions using Gemini
-  app.post("/api/db/ai-correct-questions", async (req, res) => {
+  app.all("/api/db/ai-correct-questions", async (req, res) => {
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || apiKey.trim() === "") {
@@ -311,20 +311,36 @@ async function startServer() {
         return res.status(400).json({ error: "The central question database appears empty. Please seed or upload subjects first!" });
       }
 
-      // Filter questions that are custom uploaded or manual additions
-      const uploadedQuestions = questions.filter(q => q.isUploaded === true);
+      const allUploaded = questions.filter(q => q.isUploaded === true);
 
-      if (uploadedQuestions.length === 0) {
+      if (allUploaded.length === 0) {
         return res.json({
           success: true,
           message: "No custom uploaded questions were found. All questions belong to the core database.",
           analyzedCount: 0,
           correctionsCount: 0,
-          corrections: []
+          corrections: [],
+          totalUploaded: 0,
+          totalRemaining: 0
         });
       }
 
-      console.log(`[AI Auto-Correct] Beginning audit on ${uploadedQuestions.length} custom-uploaded questions...`);
+      // Filter unverified questions first to process in bite-sized chunks
+      let uploadedQuestions = allUploaded.filter(q => !q.aiVerified);
+      let isReRun = false;
+
+      // If all are already verified, but they clicked anyway, re-evaluate the first slice of all custom uploads
+      if (uploadedQuestions.length === 0) {
+        uploadedQuestions = allUploaded;
+        isReRun = true;
+      }
+
+      // Cap at 30 questions per call so it runs in ~5 seconds and NEVER hits a gateway timeout!
+      const MAX_PER_RUN = 30;
+      const totalRemaining = isReRun ? 0 : Math.max(0, uploadedQuestions.length - MAX_PER_RUN);
+      uploadedQuestions = uploadedQuestions.slice(0, MAX_PER_RUN);
+
+      console.log(`[AI Auto-Correct] Beginning audit on ${uploadedQuestions.length} custom-uploaded questions (Remaining unverified: ${totalRemaining})...`);
 
       // Batch size of 15 questions to ensure extreme precision and stay well within rate limits
       const BATCH_SIZE = 15;
@@ -348,7 +364,7 @@ Questions to analyze:
 ${JSON.stringify(formattedBatch, null, 2)}`;
 
         const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
+          model: "gemini-3.1-flash-lite",
           contents: prompt,
           config: {
             systemInstruction: "You are an expert junior secondary curriculum board examiner and academic checker for JSS3 / BECE exams in Nigeria. Your job is to select the exact correct matching option from the options provided for each question, and explain correct reasoning.",
@@ -440,7 +456,8 @@ ${JSON.stringify(formattedBatch, null, 2)}`;
             updatedQuestionsMap.set(originalQuestion.id, {
               ...originalQuestion,
               correctAnswer: cleanMatchedOption,
-              explanation: correction.explanation || originalQuestion.explanation || "Verified JSS3 CBT correct answer."
+              explanation: correction.explanation || originalQuestion.explanation || "Verified JSS3 CBT correct answer.",
+              aiVerified: true
             });
           }
         } catch (parseError) {
@@ -452,6 +469,12 @@ ${JSON.stringify(formattedBatch, null, 2)}`;
       const finalQuestionsList = questions.map(q => {
         if (updatedQuestionsMap.has(q.id)) {
           return updatedQuestionsMap.get(q.id);
+        }
+        if (uploadedQuestions.some(uq => uq.id === q.id)) {
+          return {
+            ...q,
+            aiVerified: true
+          };
         }
         return q;
       });
@@ -481,6 +504,8 @@ ${JSON.stringify(formattedBatch, null, 2)}`;
         analyzedCount: uploadedQuestions.length,
         correctionsCount: correctionsMade.length,
         corrections: correctionsMade,
+        totalUploaded: allUploaded.length,
+        totalRemaining: totalRemaining,
         version: dbChangeCounter
       });
 

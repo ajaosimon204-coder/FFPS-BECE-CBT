@@ -84,6 +84,8 @@ export default function AdminDashboard({
     analyzedCount: number;
     correctionsCount: number;
     corrections: Array<{ id: string; questionText: string; oldAnswer: string; newAnswer: string; explanation: string }>;
+    totalUploaded?: number;
+    totalRemaining?: number;
   } | null>(null);
   const [aiHealingError, setAiHealingError] = useState<string | null>(null);
 
@@ -95,7 +97,8 @@ export default function AdminDashboard({
       try {
         const response = await fetch("/api/db/ai-correct-questions", {
           method: "POST",
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
         });
         
         if (!response.ok) {
@@ -1647,6 +1650,12 @@ ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;`);
                             {questions.filter(q => q.isUploaded).length} Items
                           </span>
                         </div>
+                        <div className="flex justify-between items-center text-[10px] uppercase font-black tracking-wider text-slate-400">
+                          <span>Unverified Remaining:</span>
+                          <span className="bg-amber-50 text-amber-650 dark:bg-amber-950/50 dark:text-amber-400 px-2 py-0.5 rounded font-black text-[10px]">
+                            {questions.filter(q => q.isUploaded && !q.aiVerified).length} Items
+                          </span>
+                        </div>
                       </div>
 
                       {aiHealingStatus === "idle" && (
@@ -1659,7 +1668,7 @@ ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;`);
                               : "bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-550 text-white"
                           }`}
                         >
-                          <LucideIcon name="Sparkles" size={13} /> Review & Correct Uploads
+                          <LucideIcon name="Sparkles" size={13} /> {questions.filter(q => q.isUploaded && !q.aiVerified).length > 0 ? "Correct Next 30 Uploads" : "Re-Verify All Uploads"}
                         </button>
                       )}
 
@@ -1700,6 +1709,11 @@ ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;`);
                               <div>Reviewed: <span className="font-black text-slate-700 dark:text-slate-350">{aiHealingResults.analyzedCount}</span></div>
                               <div>Corrections: <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{aiHealingResults.correctionsCount}</span></div>
                             </div>
+                            {aiHealingResults.totalRemaining !== undefined && aiHealingResults.totalRemaining > 0 && (
+                              <div className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 border-t border-emerald-200/40 dark:border-emerald-900/20 pt-1.5 mt-1.5">
+                                📊 Progress: {aiHealingResults.totalRemaining} more items left to verify.
+                              </div>
+                            )}
                           </div>
 
                           {aiHealingResults.correctionsCount > 0 ? (
