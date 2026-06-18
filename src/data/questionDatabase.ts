@@ -869,16 +869,16 @@ export function getQuestionsFromDB(): Question[] {
     const parsedList = JSON.parse(current) as Question[];
     const healed = parsedList.map((q) => {
       let ansVal = (q.correctAnswer || "").trim();
-      const cleanAns = ansVal.toLowerCase();
+      const cleanAns = ansVal.toLowerCase().replace(/[.)\s]+/g, "");
       let updatedAns = q.correctAnswer;
       
-      if (cleanAns === "a" || cleanAns === "option a" || cleanAns === "optiona") {
+      if (cleanAns === "a" || cleanAns === "optiona" || cleanAns === "1") {
         updatedAns = q.options[0] || q.correctAnswer;
-      } else if (cleanAns === "b" || cleanAns === "option b" || cleanAns === "optionb") {
+      } else if (cleanAns === "b" || cleanAns === "optionb" || cleanAns === "2") {
         updatedAns = q.options[1] || q.correctAnswer;
-      } else if (cleanAns === "c" || cleanAns === "option c" || cleanAns === "optionc") {
+      } else if (cleanAns === "c" || cleanAns === "optionc" || cleanAns === "3") {
         updatedAns = q.options[2] || q.correctAnswer;
-      } else if (cleanAns === "d" || cleanAns === "option d" || cleanAns === "optiond") {
+      } else if (cleanAns === "d" || cleanAns === "optiond" || cleanAns === "4") {
         updatedAns = q.options[3] || q.correctAnswer;
       }
       

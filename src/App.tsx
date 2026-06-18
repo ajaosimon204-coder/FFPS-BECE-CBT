@@ -261,15 +261,46 @@ export default function App() {
     let correct = 0;
     const correctionsList = activeQ.map((q) => {
       const studentAns = userAnswers[q.id] || "No answer selected";
-      const isOk = studentAns === q.correctAnswer;
+      
+      // Highly resilient comparing block
+      const cleanStudent = studentAns.trim().replace(/^['"\s]+|['"\s]+$/g, '').toLowerCase();
+      const cleanCorrect = (q.correctAnswer || "").trim().replace(/^['"\s]+|['"\s]+$/g, '').toLowerCase();
+      
+      let isOk = cleanStudent === cleanCorrect;
+      
+      let displayCorrectAnswer = q.correctAnswer;
+      const opts = q.originalOptions && q.originalOptions.length > 0 ? q.originalOptions : q.options;
+
+      // Check if correct answer was a letter or labeled index
+      let correctOptionIndex = -1;
+      const cleanPattern = cleanCorrect.replace(/[.)\s]+/g, "");
+      if (cleanPattern === "a" || cleanPattern === "optiona" || cleanPattern === "1") {
+        correctOptionIndex = 0;
+      } else if (cleanPattern === "b" || cleanPattern === "optionb" || cleanPattern === "2") {
+        correctOptionIndex = 1;
+      } else if (cleanPattern === "c" || cleanPattern === "optionc" || cleanPattern === "3") {
+        correctOptionIndex = 2;
+      } else if (cleanPattern === "d" || cleanPattern === "optiond" || cleanPattern === "4") {
+        correctOptionIndex = 3;
+      }
+
+      if (opts && correctOptionIndex >= 0 && correctOptionIndex < opts.length) {
+        const correspondingOptText = opts[correctOptionIndex];
+        const cleanOptionText = correspondingOptText.trim().replace(/^['"\s]+|['"\s]+$/g, '').toLowerCase();
+        if (cleanStudent === cleanOptionText) {
+          isOk = true;
+        }
+        displayCorrectAnswer = correspondingOptText;
+      }
+
       if (isOk) correct++;
 
       return {
         questionId: q.id,
         questionText: q.questionText,
-        options: q.options || q.originalOptions,
+        options: opts,
         studentAnswer: studentAns,
-        correctAnswer: q.correctAnswer,
+        correctAnswer: displayCorrectAnswer,
         explanation: q.explanation,
         isCorrect: isOk,
         topic: q.topic

@@ -542,14 +542,14 @@ export default function AdminDashboard({
       const opts = [newQForm.optA, newQForm.optB, newQForm.optC, newQForm.optD].filter(Boolean);
       
       let ansVal = (newQForm.correctAnswer || newQForm.optA).trim();
-      const cleanAns = ansVal.toLowerCase();
-      if (cleanAns === "a" || cleanAns === "option a" || cleanAns === "optiona") {
+      const cleanAns = ansVal.toLowerCase().replace(/[.)\s]+/g, "");
+      if (cleanAns === "a" || cleanAns === "optiona" || cleanAns === "1") {
         ansVal = newQForm.optA;
-      } else if (cleanAns === "b" || cleanAns === "option b" || cleanAns === "optionb") {
+      } else if (cleanAns === "b" || cleanAns === "optionb" || cleanAns === "2") {
         ansVal = newQForm.optB;
-      } else if (cleanAns === "c" || cleanAns === "option c" || cleanAns === "optionc") {
+      } else if (cleanAns === "c" || cleanAns === "optionc" || cleanAns === "3") {
         ansVal = newQForm.optC;
-      } else if (cleanAns === "d" || cleanAns === "option d" || cleanAns === "optiond") {
+      } else if (cleanAns === "d" || cleanAns === "optiond" || cleanAns === "4") {
         ansVal = newQForm.optD;
       }
 
@@ -599,16 +599,16 @@ export default function AdminDashboard({
       const idx = list.findIndex((q) => q.id === editingQuestion.id);
       if (idx !== -1) {
         let ansVal = (editingQuestion.correctAnswer || "").trim();
-        const cleanAns = ansVal.toLowerCase();
+        const cleanAns = ansVal.toLowerCase().replace(/[.)\s]+/g, "");
         let updatedAns = editingQuestion.correctAnswer;
         
-        if (cleanAns === "a" || cleanAns === "option a" || cleanAns === "optiona") {
+        if (cleanAns === "a" || cleanAns === "optiona" || cleanAns === "1") {
           updatedAns = editingQuestion.options[0] || editingQuestion.correctAnswer;
-        } else if (cleanAns === "b" || cleanAns === "option b" || cleanAns === "optionb") {
+        } else if (cleanAns === "b" || cleanAns === "optionb" || cleanAns === "2") {
           updatedAns = editingQuestion.options[1] || editingQuestion.correctAnswer;
-        } else if (cleanAns === "c" || cleanAns === "option c" || cleanAns === "optionc") {
+        } else if (cleanAns === "c" || cleanAns === "optionc" || cleanAns === "3") {
           updatedAns = editingQuestion.options[2] || editingQuestion.correctAnswer;
-        } else if (cleanAns === "d" || cleanAns === "option d" || cleanAns === "optiond") {
+        } else if (cleanAns === "d" || cleanAns === "optiond" || cleanAns === "4") {
           updatedAns = editingQuestion.options[3] || editingQuestion.correctAnswer;
         }
 
@@ -749,7 +749,7 @@ export default function AdminDashboard({
         const bVal = cols[optB];
         const cVal = optC !== -1 && cols[optC] ? cols[optC] : "";
         const dVal = optD !== -1 && cols[optD] ? cols[optD] : "";
-        const ansVal = ansIdx !== -1 && cols[ansIdx] ? cols[ansIdx] : aVal;
+        let ansVal = ansIdx !== -1 && cols[ansIdx] ? cols[ansIdx].trim() : aVal;
         const expVal = expIdx !== -1 && cols[expIdx] ? cols[expIdx] : "Imported verification.";
         const diffVal: "Easy" | "Medium" | "Hard" =
           diffIdx !== -1 && (cols[diffIdx] === "Easy" || cols[diffIdx] === "Hard")
@@ -758,6 +758,18 @@ export default function AdminDashboard({
         const topicVal = topicIdx !== -1 && cols[topicIdx] ? cols[topicIdx] : "Imported Topic";
 
         const opts = [aVal, bVal, cVal, dVal].filter(Boolean);
+
+        // Translate A., Option A, C), etc. to the actual option text
+        const cleanAns = ansVal.toLowerCase().replace(/[.)\s]+/g, "");
+        if (cleanAns === "a" || cleanAns === "optiona" || cleanAns === "1") {
+          ansVal = aVal;
+        } else if (cleanAns === "b" || cleanAns === "optionb" || cleanAns === "2") {
+          ansVal = bVal;
+        } else if (cleanAns === "c" || cleanAns === "optionc" || cleanAns === "3") {
+          ansVal = cVal;
+        } else if (cleanAns === "d" || cleanAns === "optiond" || cleanAns === "4") {
+          ansVal = dVal;
+        }
 
         list.unshift({
           id: `${subjectVal}_bulk_${Date.now()}_${i}`,
