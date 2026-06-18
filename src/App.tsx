@@ -149,12 +149,16 @@ export default function App() {
     setAuthError("");
 
     if (authMode === "login") {
-      const logged = loginUser(email, password);
+      const loginEmail = authRole === UserRole.ADMIN ? (email.trim() || "admin@faith.edu") : email;
+      const logged = loginUser(loginEmail, password);
       if (logged) {
         setCurrentUser(logged);
         setView(logged.role === UserRole.ADMIN ? "ADMIN_DASHBOARD" : "STUDENT_DASHBOARD");
       } else {
-        setAuthError("Invalid credentials! Please try again or use direct credentials shortcuts.");
+        setAuthError(authRole === UserRole.ADMIN 
+          ? "Incorrect Access Password! Please verify and enter the valid administrative master password (faith123)."
+          : "Invalid email or password! Please try again."
+        );
       }
     } else {
       if (!fullName) {
@@ -181,7 +185,7 @@ export default function App() {
       setAuthMode("login");
     } else {
       setEmail("admin@faith.edu");
-      setPassword("admin123");
+      setPassword("faith123");
       setAuthRole(UserRole.ADMIN);
       setAuthMode("login");
     }
@@ -341,23 +345,26 @@ export default function App() {
               </div>
 
               {/* DEMO SHORTCUTS */}
-              <div className="p-4 bg-slate-50/50 dark:bg-slate-950/60 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 text-center space-y-3">
-                <span className="text-[9px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest block font-mono">Quick Demo Shortcuts:</span>
-                <div className="flex flex-col sm:flex-row justify-center gap-2">
-                  <button
-                    onClick={() => handleCredentialShortcut("STUDENT")}
-                    className="px-3 py-1.5 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold tracking-wider rounded-lg hover:border-indigo-500 hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20 transition-all text-indigo-600 dark:text-indigo-400 cursor-pointer"
-                  >
-                    🚀 Adebayo (Student)
-                  </button>
-                  <button
-                    onClick={() => handleCredentialShortcut("ADMIN")}
-                    className="px-3 py-1.5 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold tracking-wider rounded-lg hover:border-purple-500 hover:bg-purple-50/20 dark:hover:bg-purple-950/20 transition-all text-purple-600 dark:text-purple-400 cursor-pointer"
-                  >
-                    👑 Mr. Simon (Admin)
-                  </button>
+              {authRole === UserRole.STUDENT && (
+                <div className="p-4 bg-slate-50/50 dark:bg-slate-950/60 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 text-center space-y-3">
+                  <span className="text-[9px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest block font-mono">Quick Access Shortcuts:</span>
+                  <div className="flex flex-col sm:flex-row justify-center gap-2">
+                    <button
+                      onClick={() => handleCredentialShortcut("STUDENT")}
+                      className="px-3 py-1.5 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold tracking-wider rounded-lg hover:border-indigo-500 hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20 transition-all text-indigo-600 dark:text-indigo-400 cursor-pointer"
+                    >
+                      🚀 Student Demo Profile
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {authRole === UserRole.ADMIN && authMode === "login" && (
+                <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/30 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 text-center space-y-1">
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block font-sans">🔒 ADMINISTRATIVE ACCESS ONLY</span>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">Enter the administrative access password below to unlock the secure educator dashboard.</p>
+                </div>
+              )}
 
               <form onSubmit={handleAuthSubmit} className="space-y-4">
                 {authError && (
@@ -380,24 +387,28 @@ export default function App() {
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5">Registered Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. candidate@faith.edu"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border focus:ring-1 focus:ring-indigo-500 outline-none bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100"
-                  />
-                </div>
+                {!(authRole === UserRole.ADMIN && authMode === "login") && (
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5">Registered Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. candidate@faith.edu"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border focus:ring-1 focus:ring-indigo-500 outline-none bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                )}
 
                 <div>
-                  <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5">Secure Password</label>
+                  <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-1.5">
+                    {authRole === UserRole.ADMIN && authMode === "login" ? "Administrative Access Password" : "Secure Password"}
+                  </label>
                   <input
                     type="password"
                     required
-                    placeholder="Enter password..."
+                    placeholder={authRole === UserRole.ADMIN && authMode === "login" ? "Enter access password (faith123)..." : "Enter password..."}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border focus:ring-1 focus:ring-indigo-500 outline-none bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100"
@@ -409,19 +420,21 @@ export default function App() {
                   className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm transition-all cursor-pointer animate-duration-150"
                   id="auth-submit-btn"
                 >
-                  {authMode === "login" ? "Verify Credentials & Sign In" : `Register ${authRole === UserRole.ADMIN ? "Educator" : "Candidate"} Account`}
+                  {authMode === "login" ? (authRole === UserRole.ADMIN ? "Unlock Administrative Console" : "Verify Credentials & Sign In") : `Register ${authRole === UserRole.ADMIN ? "Educator" : "Candidate"} Account`}
                 </button>
               </form>
 
               {/* Toggles */}
               <div className="text-center text-xs border-t border-slate-100 dark:border-slate-800/60 pt-4">
                 {authMode === "login" ? (
-                  <p className="text-slate-400 font-medium text-xs">
-                    New {authRole === UserRole.ADMIN ? "educator" : "candidate"} to this portal?{" "}
-                    <button onClick={() => setAuthMode("register")} className="text-indigo-650 dark:text-indigo-400 font-bold uppercase tracking-wide hover:underline cursor-pointer">
-                      Create Account
-                    </button>
-                  </p>
+                  authRole === UserRole.STUDENT ? (
+                    <p className="text-slate-400 font-medium text-xs">
+                      New candidate to this portal?{" "}
+                      <button onClick={() => setAuthMode("register")} className="text-indigo-650 dark:text-indigo-400 font-bold uppercase tracking-wide hover:underline cursor-pointer">
+                        Create Account
+                      </button>
+                    </p>
+                  ) : null
                 ) : (
                   <p className="text-slate-400 font-medium text-xs">
                     Already registered your name?{" "}

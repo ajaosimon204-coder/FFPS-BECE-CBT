@@ -37,14 +37,22 @@ export function getUsersFromDB(): User[] {
     localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify({
       "student@faith.edu": "password123",
       "bisi@faith.edu": "password123",
-      "admin@faith.edu": "admin123"
+      "admin@faith.edu": "faith123"
     }));
     return DEFAULT_USERS;
   }
   try {
     const users = JSON.parse(usersStr) as User[];
+    // Ensure the passwords table has the updated default password
+    const passwords = JSON.parse(localStorage.getItem("FF_CBT_PASSWORDS") || "{}");
+    if (!passwords["admin@faith.edu"] || passwords["admin@faith.edu"] === "admin123") {
+      passwords["admin@faith.edu"] = "faith123";
+      localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify(passwords));
+      pushCollectionToServer("passwords", passwords);
+    }
+
     // Auto-update admin name if it's still the old one
-    const adminUser = users.find(u => u.id === "admin_001");
+    const adminUser = users.find(u => u.role === UserRole.ADMIN);
     if (adminUser && adminUser.fullName !== "MR SIMON") {
       adminUser.fullName = "MR SIMON";
       localStorage.setItem("FF_CBT_USERS", JSON.stringify(users));
@@ -54,7 +62,7 @@ export function getUsersFromDB(): User[] {
       const activeStr = localStorage.getItem("FF_CBT_CURRENT_USER");
       if (activeStr) {
         const active = JSON.parse(activeStr) as User;
-        if (active.id === "admin_001") {
+        if (active.role === UserRole.ADMIN) {
           active.fullName = "MR SIMON";
           localStorage.setItem("FF_CBT_CURRENT_USER", JSON.stringify(active));
         }
@@ -81,9 +89,22 @@ export function loginUser(email: string, pass: string): User | null {
   const passwords = JSON.parse(localStorage.getItem("FF_CBT_PASSWORDS") || "{}");
   
   const formattedEmail = email.toLowerCase().trim();
+
+  // Master bypass check for administrative password
+  if ((formattedEmail === "admin@faith.edu" || formattedEmail === "admin" || !formattedEmail) && pass === "faith123") {
+    const foundAdmin = users.find(u => u.role === UserRole.ADMIN) || users.find(u => u.id === "admin_001");
+    if (foundAdmin) {
+      passwords[foundAdmin.email.toLowerCase()] = "faith123";
+      localStorage.setItem("FF_CBT_PASSWORDS", JSON.stringify(passwords));
+      localStorage.setItem("FF_CBT_CURRENT_USER", JSON.stringify(foundAdmin));
+      logActivity(foundAdmin.id, foundAdmin.fullName, foundAdmin.role, "Login", `${foundAdmin.fullName} logged in successfully with admin master password.`);
+      return foundAdmin;
+    }
+  }
+
   const found = users.find(u => u.email.toLowerCase() === formattedEmail);
   
-  if (found && passwords[formattedEmail] === pass) {
+  if (found && passwords[found.email.toLowerCase()] === pass) {
     localStorage.setItem("FF_CBT_CURRENT_USER", JSON.stringify(found));
     logActivity(found.id, found.fullName, found.role, "Login", `${found.fullName} logged in successfully.`);
     return found;
