@@ -5,7 +5,7 @@ import { getCurrentUser, loginUser, registerStudent, registerUser, logoutUser, g
 import { getQuestionsFromDB } from "./data/questionDatabase";
 import { saveResult, getGrade } from "./lib/results";
 import { SUBJECTS } from "./data/subjectData";
-import { syncWithServer } from "./lib/sync";
+import { syncWithServer, getClientSupabase, syncDirectWithClientSupabase } from "./lib/sync";
 import schoolLogo from "./assets/images/school_logo_1781627574517.jpg";
 
 // Subcomponets
@@ -74,13 +74,53 @@ export default function App() {
             console.log(`[Sync Engine] Central DB modified by another gadget. Syncing from version ${localVersion} to ${version}...`);
             await syncWithServer();
           }
+        } else {
+          // If Express API is offline/unavailable, fallback to polling direct browser Supabase!
+          await pollDirectSupabase();
         }
       } catch (err) {
-        console.warn("[Sync Engine] Background version poll:", err);
+        // If Express API throws (offline/unreachable), fallback to polling direct browser Supabase!
+        await pollDirectSupabase();
       } finally {
         if (active) {
           pollTimeout = setTimeout(checkVersionAndSync, 2000); // Check version every 2 seconds for near real-time updates!
         }
+      }
+    }
+
+    async function pollDirectSupabase() {
+      try {
+        const client = getClientSupabase();
+        if (!client) return;
+
+        // Fetch just the lightweight metadata fields (key, updated_at) to avoid fetching large payloads
+        const { data, error } = await client.from("cbt_sync_store").select("key, updated_at");
+        if (error || !data) return;
+
+        const savedTimestampsStr = localStorage.getItem("FF_CBT_DB_SYNCED_TIMESTAMPS") || "{}";
+        let localTimestamps: Record<string, string> = {};
+        try {
+          localTimestamps = JSON.parse(savedTimestampsStr);
+        } catch (e) {}
+
+        let outOfDate = false;
+        for (const row of data) {
+          const cloudTime = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+          const localTimeStr = localTimestamps[row.key];
+          const localTime = localTimeStr ? new Date(localTimeStr).getTime() : 0;
+
+          if (cloudTime > localTime + 500) { // Keep fine buffer
+            outOfDate = true;
+            console.log(`[Supabase Poll] Cloud collection "${row.key}" is newer (${row.updated_at}) than local copy (${localTimeStr}). Syncing...`);
+            break;
+          }
+        }
+
+        if (outOfDate) {
+          await syncDirectWithClientSupabase();
+        }
+      } catch (e) {
+        // Suppress silent log noises in isolated environments
       }
     }
 

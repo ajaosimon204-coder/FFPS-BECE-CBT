@@ -51,8 +51,10 @@ export async function syncDirectWithClientSupabase(): Promise<boolean> {
 
     if (data && data.length > 0) {
       const db: any = {};
+      const syncedTimestamps: Record<string, string> = {};
       data.forEach((row: any) => {
         db[row.key] = row.data;
+        syncedTimestamps[row.key] = row.updated_at || new Date().toISOString();
       });
 
       if (db.questions) localStorage.setItem("FF_CBT_QUESTIONS", JSON.stringify(db.questions));
@@ -64,6 +66,7 @@ export async function syncDirectWithClientSupabase(): Promise<boolean> {
       
       localStorage.setItem("FF_CBT_DB_INITIALIZED", "true");
       localStorage.setItem("FF_CBT_DB_V5_STABLE", "true");
+      localStorage.setItem("FF_CBT_DB_SYNCED_TIMESTAMPS", JSON.stringify(syncedTimestamps));
 
       const currentVersion = parseInt(localStorage.getItem("FF_CBT_DB_VERSION") || "0", 10);
       localStorage.setItem("FF_CBT_DB_VERSION", String(currentVersion + 1));
@@ -89,16 +92,21 @@ export async function syncDirectWithClientSupabase(): Promise<boolean> {
         logs: defaultLogs
       };
 
+      const seededTimestamps: Record<string, string> = {};
+      const nowStr = new Date().toISOString();
+
       for (const [key, val] of Object.entries(collections)) {
         await client.from("cbt_sync_store").upsert({
           key,
           data: val,
-          updated_at: new Date().toISOString()
+          updated_at: nowStr
         });
+        seededTimestamps[key] = nowStr;
       }
 
       localStorage.setItem("FF_CBT_DB_INITIALIZED", "true");
       localStorage.setItem("FF_CBT_DB_V5_STABLE", "true");
+      localStorage.setItem("FF_CBT_DB_SYNCED_TIMESTAMPS", JSON.stringify(seededTimestamps));
       
       const currentVersion = parseInt(localStorage.getItem("FF_CBT_DB_VERSION") || "0", 10);
       localStorage.setItem("FF_CBT_DB_VERSION", String(currentVersion + 1));
@@ -223,12 +231,22 @@ export async function pushCollectionToServer(key: string, data: any): Promise<bo
     const client = getClientSupabase();
     if (client) {
       try {
+        const nowStr = new Date().toISOString();
         const { error } = await client.from("cbt_sync_store").upsert({
           key,
           data,
-          updated_at: new Date().toISOString()
+          updated_at: nowStr
         });
         if (!error) {
+          // Update local synced timestamps registry so we don't treat our own save as out-of-date
+          const savedTimestampsStr = localStorage.getItem("FF_CBT_DB_SYNCED_TIMESTAMPS") || "{}";
+          let localTimestamps: Record<string, string> = {};
+          try {
+            localTimestamps = JSON.parse(savedTimestampsStr);
+          } catch (tErr) {}
+          localTimestamps[key] = nowStr;
+          localStorage.setItem("FF_CBT_DB_SYNCED_TIMESTAMPS", JSON.stringify(localTimestamps));
+
           const currentVersion = parseInt(localStorage.getItem("FF_CBT_DB_VERSION") || "0", 10);
           localStorage.setItem("FF_CBT_DB_VERSION", String(currentVersion + 1));
           window.dispatchEvent(new Event("cbt-db-synced"));
