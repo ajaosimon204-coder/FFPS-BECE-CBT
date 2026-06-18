@@ -166,6 +166,41 @@ export default function AdminDashboard({
   const [showSqlGuide, setShowSqlGuide] = useState(false);
   const [isCloudSaving, setIsCloudSaving] = useState(false);
   const [cloudSaveMessage, setCloudSaveMessage] = useState("");
+  const [deletingSubjectId, setDeletingSubjectId] = useState<string | null>(null);
+
+  const handleDeleteUploadedBySubject = async (subId: string) => {
+    if (!confirm(`Are you sure you want to remove ALL custom uploaded questions for subject: "${subId}"? This will preserve the core syllabus questions completely.`)) {
+      return;
+    }
+    
+    setIsCloudSaving(true);
+    setCloudSaveMessage(`Removing custom questions for ${subId}...`);
+    
+    try {
+      const currentDB = getQuestionsFromDB();
+      const filtered = currentDB.filter(q => !(q.subjectId === subId && q.isUploaded));
+      
+      const syncOk = await saveQuestionsToDB(filtered);
+      setQuestions(filtered);
+      
+      logActivity(
+        user.id,
+        user.fullName,
+        UserRole.ADMIN,
+        "Delete custom subject questions",
+        `Deleted all custom uploaded questions for subject ID: ${subId}.`
+      );
+      
+      setFileImportSuccess(`Successfully deleted all custom uploaded questions for "${subId}".`);
+      setTimeout(() => setFileImportSuccess(""), 5000);
+    } catch (err: any) {
+      alert(`Failed to delete questions: ${err.message || err}`);
+    } finally {
+      setIsCloudSaving(false);
+      setCloudSaveMessage("");
+      setDeletingSubjectId(null);
+    }
+  };
 
   useEffect(() => {
     async function checkSupabase() {
@@ -1752,6 +1787,76 @@ ALTER TABLE cbt_sync_store DISABLE ROW LEVEL SECURITY;`);
                           </button>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Custom Uploads Manager */}
+                  <div className={`p-6 rounded-2xl border-2 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"} space-y-4 shadow-sm`}>
+                    <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-3">
+                      <div className="p-2 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-450">
+                        <LucideIcon name="Trash2" size={15} />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">Manage Custom Uploads</h3>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Remove custom additions by syllabus subject</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-slate-500 dark:text-slate-450 leading-normal text-[11px] font-medium">
+                        If you uploaded some wrong questions or want to clean up an entire subject's custom-uploaded spreadsheet to start fresh, select them below.
+                      </p>
+
+                      {(() => {
+                        const customSubjectGroups = Object.entries(
+                          questions.filter(q => q.isUploaded).reduce((acc, q) => {
+                            acc[q.subjectId] = (acc[q.subjectId] || 0) + 1;
+                            return acc;
+                          }, {} as Record<string, number>)
+                        ).map(([subId, count]) => {
+                          const match = SUBJECTS.find(s => s.id === subId);
+                          return {
+                            id: subId,
+                            name: match ? match.name : subId.replace(/_/g, ' '),
+                            count
+                          };
+                        });
+
+                        if (customSubjectGroups.length === 0) {
+                          return (
+                            <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl text-center text-slate-400 font-bold uppercase text-[9px] tracking-wider border border-dashed border-slate-200 dark:border-slate-800">
+                              No custom uploads found in database. All questions belong to the core curriculum.
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                            {customSubjectGroups.map((group) => (
+                              <div
+                                key={group.id}
+                                className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-950/45 border border-slate-150 dark:border-slate-850 rounded-xl"
+                              >
+                                <div className="space-y-0.5 min-w-0 pr-2">
+                                  <div className="text-[11px] font-black uppercase text-slate-705 dark:text-slate-300 truncate">
+                                    {group.name}
+                                  </div>
+                                  <div className="text-[9px] text-slate-400 font-bold uppercase">
+                                    {group.count} Custom Items
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => handleDeleteUploadedBySubject(group.id)}
+                                  className="p-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/35 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                                >
+                                  <LucideIcon name="Trash2" size={10} /> Clear
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
